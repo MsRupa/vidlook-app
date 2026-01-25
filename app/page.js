@@ -818,8 +818,93 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+      <div className="pb-24">
+        {/* Profile Header Skeleton */}
+        <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 p-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-16 h-16 rounded-full bg-gray-700" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-32 bg-gray-700" />
+              <Skeleton className="h-4 w-24 bg-gray-700" />
+            </div>
+            <Skeleton className="h-10 w-24 rounded-lg bg-gray-700" />
+          </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 gap-3 mt-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="bg-black/30 border-gray-700">
+                <CardContent className="p-4 space-y-2">
+                  <Skeleton className="h-3 w-20 bg-gray-700" />
+                  <Skeleton className="h-7 w-16 bg-gray-700" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Tasks Skeleton */}
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="w-5 h-5 rounded-full bg-gray-700" />
+            <Skeleton className="h-5 w-32 bg-gray-700" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="bg-gray-900 border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-10 h-10 rounded-lg bg-gray-700" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-40 bg-gray-700" />
+                      <Skeleton className="h-3 w-20 bg-gray-700" />
+                    </div>
+                    <Skeleton className="h-8 w-16 rounded-lg bg-gray-700" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* FAQ Skeleton */}
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="w-5 h-5 rounded-full bg-gray-700" />
+            <Skeleton className="h-5 w-16 bg-gray-700" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="bg-gray-900 border-gray-800">
+                <CardContent className="p-4">
+                  <Skeleton className="h-4 w-full bg-gray-700" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Activity Skeleton */}
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Skeleton className="w-5 h-5 rounded-full bg-gray-700" />
+            <Skeleton className="h-5 w-28 bg-gray-700" />
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="bg-gray-900 border-gray-800">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-lg bg-gray-700" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-24 bg-gray-700" />
+                    <Skeleton className="h-3 w-32 bg-gray-700" />
+                  </div>
+                  <Skeleton className="h-5 w-12 rounded-full bg-gray-700" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -828,15 +913,15 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
     <div className="pb-24">
       {/* Profile Header */}
       <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 p-6">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white">
-            <User className="w-8 h-8" />
+        <div className="flex items-center gap-3">
+          <div className="w-14 h-14 flex-shrink-0 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white">
+            <User className="w-7 h-7" />
           </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-white">@{user?.username}</h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-bold text-white truncate">@{user?.username}</h2>
             <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
               <span className="truncate">{user?.walletAddress?.slice(0, 6)}...{user?.walletAddress?.slice(-4)}</span>
-              <button onClick={copyAddress}>
+              <button onClick={copyAddress} className="flex-shrink-0">
                 <Copy className="w-4 h-4 hover:text-white transition" />
               </button>
             </div>
@@ -844,7 +929,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
           <Button 
             onClick={onLogout}
             variant="outline"
-            className="bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 px-4 py-2 flex items-center gap-2"
+            className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 px-3 py-2 flex items-center gap-2"
           >
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
