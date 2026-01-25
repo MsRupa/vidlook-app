@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
-import { getCollection } from '@/lib/mongodb';
+import { supabase } from '@/lib/supabase';
 import { getCachedData, setCachedData } from '@/lib/redis';
 import { searchYoutubeVideos, getRandomVideosForRegion } from '@/lib/youtube';
 
@@ -30,12 +29,26 @@ export async function GET(request, { params }) {
     // Get user by wallet address
     if (path.startsWith('/users/')) {
       const walletAddress = pathSegments[1];
-      const users = await getCollection('users');
-      const user = await users.findOne({ walletAddress });
-      if (!user) {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('wallet_address', walletAddress)
+        .single();
+      
+      if (error || !user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404, headers: corsHeaders });
       }
-      return NextResponse.json(user, { headers: corsHeaders });
+      
+      // Transform to camelCase for frontend compatibility
+      return NextResponse.json({
+        id: user.id,
+        walletAddress: user.wallet_address,
+        username: user.username,
+        country: user.country,
+        totalTokens: user.total_tokens,
+        totalWatchedSeconds: user.total_watched_seconds,
+        joinedAt: user.joined_at
+      }, { headers: corsHeaders });
     }
     
     // Get videos for feed
@@ -90,24 +103,62 @@ export async function GET(request, { params }) {
     // Get watch history
     if (path.startsWith('/history/')) {
       const userId = pathSegments[1];
-      const watchHistory = await getCollection('watchHistory');
-      const history = await watchHistory.find({ userId }).sort({ timestamp: -1 }).limit(50).toArray();
-      return NextResponse.json(history, { headers: corsHeaders });
+      const { data: history, error } = await supabase
+        .from('watch_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false })
+        .limit(50);
+      
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      // Transform to camelCase for frontend compatibility
+      return NextResponse.json(history.map(h => ({
+        id: h.id,
+        userId: h.user_id,
+        videoId: h.video_id,
+        watchedSeconds: h.watched_seconds,
+        tokensEarned: h.tokens_earned,
+        timestamp: h.timestamp
+      })), { headers: corsHeaders });
     }
     
     // Get conversion history
     if (path.startsWith('/conversions/')) {
       const userId = pathSegments[1];
-      const conversions = await getCollection('conversions');
-      const history = await conversions.find({ userId }).sort({ timestamp: -1 }).toArray();
-      return NextResponse.json(history, { headers: corsHeaders });
+      const { data: conversions, error } = await supabase
+        .from('conversions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: false });
+      
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      // Transform to camelCase for frontend compatibility
+      return NextResponse.json(conversions.map(c => ({
+        id: c.id,
+        userId: c.user_id,
+        videoTokens: c.video_tokens,
+        wldAmount: parseFloat(c.wld_amount),
+        timestamp: c.timestamp
+      })), { headers: corsHeaders });
     }
     
     // Get tasks
     if (path.startsWith('/tasks/')) {
       const userId = pathSegments[1];
-      const tasks = await getCollection('tasks');
-      const completedTasks = await tasks.find({ userId }).toArray();
+      const { data: completedTasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders });
+      }
       
       const allTasks = [
         { id: 'follow_x', name: 'Follow us on X', reward: 100, icon: '🐦' },
@@ -119,41 +170,50 @@ export async function GET(request, { params }) {
         { id: 'daily_login', name: 'Daily login bonus', reward: 20, icon: '📅', daily: true }
       ];
       
-      const completedTaskIds = completedTasks.map(t => t.taskId);
+      const completedTaskIds = completedTasks.map(t => t.task_id);
       
       return NextResponse.json(allTasks.map(task => ({
         ...task,
         completed: completedTaskIds.includes(task.id),
-        completedAt: completedTasks.find(t => t.taskId === task.id)?.completedAt
+        completedAt: completedTasks.find(t => t.task_id === task.id)?.completed_at
       })), { headers: corsHeaders });
     }
     
     // Get user stats
     if (path.startsWith('/stats/')) {
       const userId = pathSegments[1];
-      const watchHistory = await getCollection('watchHistory');
-      const conversions = await getCollection('conversions');
       
-      const totalWatchTime = await watchHistory.aggregate([
-        { $match: { userId } },
-        { $group: { _id: null, total: { $sum: '$watchedSeconds' } } }
-      ]).toArray();
+      // Get total watch time and tokens earned
+      const { data: watchStats, error: watchError } = await supabase
+        .from('watch_history')
+        .select('watched_seconds, tokens_earned')
+        .eq('user_id', userId);
       
-      const totalTokensEarned = await watchHistory.aggregate([
-        { $match: { userId } },
-        { $group: { _id: null, total: { $sum: '$tokensEarned' } } }
-      ]).toArray();
+      if (watchError) {
+        return NextResponse.json({ error: watchError.message }, { status: 500, headers: corsHeaders });
+      }
       
-      const totalConverted = await conversions.aggregate([
-        { $match: { userId } },
-        { $group: { _id: null, videoTokens: { $sum: '$videoTokens' }, wld: { $sum: '$wldAmount' } } }
-      ]).toArray();
+      const totalWatchTimeSeconds = (watchStats || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
+      const totalTokensEarned = (watchStats || []).reduce((sum, h) => sum + (h.tokens_earned || 0), 0);
+      
+      // Get conversion stats
+      const { data: conversionStats, error: convError } = await supabase
+        .from('conversions')
+        .select('video_tokens, wld_amount')
+        .eq('user_id', userId);
+      
+      if (convError) {
+        return NextResponse.json({ error: convError.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      const totalVideoTokensConverted = (conversionStats || []).reduce((sum, c) => sum + (c.video_tokens || 0), 0);
+      const totalWldEarned = (conversionStats || []).reduce((sum, c) => sum + parseFloat(c.wld_amount || 0), 0);
       
       return NextResponse.json({
-        totalWatchTimeSeconds: totalWatchTime[0]?.total || 0,
-        totalTokensEarned: totalTokensEarned[0]?.total || 0,
-        totalVideoTokensConverted: totalConverted[0]?.videoTokens || 0,
-        totalWldEarned: totalConverted[0]?.wld || 0
+        totalWatchTimeSeconds,
+        totalTokensEarned,
+        totalVideoTokensConverted,
+        totalWldEarned
       }, { headers: corsHeaders });
     }
     
@@ -173,29 +233,60 @@ export async function POST(request, { params }) {
     if (path === '/users/connect') {
       const { walletAddress, username, country } = await request.json();
       
-      const users = await getCollection('users');
-      let user = await users.findOne({ walletAddress });
+      // Check if user exists
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('wallet_address', walletAddress)
+        .single();
       
-      if (!user) {
-        user = {
-          id: uuidv4(),
-          walletAddress,
-          username: username || `user_${walletAddress.slice(0, 6)}`,
-          country: country || 'US',
-          joinedAt: new Date().toISOString(),
-          totalTokens: 0,
-          totalWatchedSeconds: 0
-        };
-        await users.insertOne(user);
-      } else {
+      if (existingUser) {
         // Update country if changed
-        if (country && country !== user.country) {
-          await users.updateOne({ walletAddress }, { $set: { country } });
-          user.country = country;
+        if (country && country !== existingUser.country) {
+          await supabase
+            .from('users')
+            .update({ country, updated_at: new Date().toISOString() })
+            .eq('id', existingUser.id);
+          existingUser.country = country;
         }
+        
+        return NextResponse.json({
+          id: existingUser.id,
+          walletAddress: existingUser.wallet_address,
+          username: existingUser.username,
+          country: existingUser.country,
+          totalTokens: existingUser.total_tokens,
+          totalWatchedSeconds: existingUser.total_watched_seconds,
+          joinedAt: existingUser.joined_at
+        }, { headers: corsHeaders });
       }
       
-      return NextResponse.json(user, { headers: corsHeaders });
+      // Create new user
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          wallet_address: walletAddress,
+          username: username || `user_${walletAddress.slice(0, 6)}`,
+          country: country || 'US',
+          total_tokens: 0,
+          total_watched_seconds: 0
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      return NextResponse.json({
+        id: newUser.id,
+        walletAddress: newUser.wallet_address,
+        username: newUser.username,
+        country: newUser.country,
+        totalTokens: newUser.total_tokens,
+        totalWatchedSeconds: newUser.total_watched_seconds,
+        joinedAt: newUser.joined_at
+      }, { headers: corsHeaders });
     }
     
     // Record watch time and award tokens
@@ -210,35 +301,48 @@ export async function POST(request, { params }) {
       const tokensEarned = Math.floor(watchedSeconds / 60) * 2;
       
       if (tokensEarned > 0) {
-        const watchHistory = await getCollection('watchHistory');
-        const users = await getCollection('users');
-        
         // Record watch history
-        await watchHistory.insertOne({
-          id: uuidv4(),
-          userId,
-          videoId,
-          watchedSeconds,
-          tokensEarned,
-          timestamp: new Date().toISOString()
-        });
+        const { error: historyError } = await supabase
+          .from('watch_history')
+          .insert({
+            user_id: userId,
+            video_id: videoId,
+            watched_seconds: watchedSeconds,
+            tokens_earned: tokensEarned
+          });
+        
+        if (historyError) {
+          return NextResponse.json({ error: historyError.message }, { status: 500, headers: corsHeaders });
+        }
+        
+        // Get current user tokens
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('total_tokens, total_watched_seconds')
+          .eq('id', userId)
+          .single();
+        
+        if (userError) {
+          return NextResponse.json({ error: userError.message }, { status: 500, headers: corsHeaders });
+        }
         
         // Update user tokens
-        await users.updateOne(
-          { id: userId },
-          { 
-            $inc: { 
-              totalTokens: tokensEarned,
-              totalWatchedSeconds: watchedSeconds 
-            } 
-          }
-        );
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            total_tokens: (user.total_tokens || 0) + tokensEarned,
+            total_watched_seconds: (user.total_watched_seconds || 0) + watchedSeconds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
         
-        const user = await users.findOne({ id: userId });
+        if (updateError) {
+          return NextResponse.json({ error: updateError.message }, { status: 500, headers: corsHeaders });
+        }
         
         return NextResponse.json({ 
           tokensEarned, 
-          totalTokens: user?.totalTokens || 0,
+          totalTokens: (user.total_tokens || 0) + tokensEarned,
           message: `Earned ${tokensEarned} VIDEO tokens!`
         }, { headers: corsHeaders });
       }
@@ -261,14 +365,18 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'Minimum conversion is 5000 VIDEO tokens' }, { status: 400, headers: corsHeaders });
       }
       
-      const users = await getCollection('users');
-      const user = await users.findOne({ id: userId });
+      // Get user
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
       
-      if (!user) {
+      if (userError || !user) {
         return NextResponse.json({ error: 'User not found' }, { status: 404, headers: corsHeaders });
       }
       
-      if (user.totalTokens < videoTokens) {
+      if (user.total_tokens < videoTokens) {
         return NextResponse.json({ error: 'Insufficient VIDEO tokens' }, { status: 400, headers: corsHeaders });
       }
       
@@ -276,28 +384,36 @@ export async function POST(request, { params }) {
       const wldAmount = videoTokens / 1000;
       
       // Record conversion
-      const conversions = await getCollection('conversions');
-      await conversions.insertOne({
-        id: uuidv4(),
-        userId,
-        videoTokens,
-        wldAmount,
-        timestamp: new Date().toISOString()
-      });
+      const { error: conversionError } = await supabase
+        .from('conversions')
+        .insert({
+          user_id: userId,
+          video_tokens: videoTokens,
+          wld_amount: wldAmount
+        });
+      
+      if (conversionError) {
+        return NextResponse.json({ error: conversionError.message }, { status: 500, headers: corsHeaders });
+      }
       
       // Deduct tokens
-      await users.updateOne(
-        { id: userId },
-        { $inc: { totalTokens: -videoTokens } }
-      );
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          total_tokens: user.total_tokens - videoTokens,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
-      const updatedUser = await users.findOne({ id: userId });
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500, headers: corsHeaders });
+      }
       
       return NextResponse.json({
         success: true,
         videoTokensUsed: videoTokens,
         wldAmount,
-        remainingTokens: updatedUser?.totalTokens || 0,
+        remainingTokens: user.total_tokens - videoTokens,
         message: `Successfully converted ${videoTokens} VIDEO to ${wldAmount} WLD!`
       }, { headers: corsHeaders });
     }
@@ -321,8 +437,13 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'Invalid task' }, { status: 400, headers: corsHeaders });
       }
       
-      const tasks = await getCollection('tasks');
-      const existingTask = await tasks.findOne({ userId, taskId });
+      // Check if already completed
+      const { data: existingTask, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('task_id', taskId)
+        .single();
       
       // Check if already completed (except daily tasks)
       if (existingTask && taskId !== 'daily_login') {
@@ -331,37 +452,60 @@ export async function POST(request, { params }) {
       
       // For daily login, check if already claimed today
       if (taskId === 'daily_login' && existingTask) {
-        const lastClaim = new Date(existingTask.completedAt);
+        const lastClaim = new Date(existingTask.completed_at);
         const today = new Date();
         if (lastClaim.toDateString() === today.toDateString()) {
           return NextResponse.json({ error: 'Daily bonus already claimed today' }, { status: 400, headers: corsHeaders });
         }
         // Update the existing record
-        await tasks.updateOne({ userId, taskId }, { $set: { completedAt: new Date().toISOString() } });
+        await supabase
+          .from('tasks')
+          .update({ completed_at: new Date().toISOString() })
+          .eq('user_id', userId)
+          .eq('task_id', taskId);
       } else {
-        // Create new task completion
-        await tasks.insertOne({
-          id: uuidv4(),
-          userId,
-          taskId,
-          reward,
-          completedAt: new Date().toISOString()
-        });
+        // Create new task completion (use upsert for daily tasks)
+        const { error: taskError } = await supabase
+          .from('tasks')
+          .upsert({
+            user_id: userId,
+            task_id: taskId,
+            reward,
+            completed_at: new Date().toISOString()
+          }, { onConflict: 'user_id,task_id' });
+        
+        if (taskError) {
+          return NextResponse.json({ error: taskError.message }, { status: 500, headers: corsHeaders });
+        }
       }
       
-      // Award tokens
-      const users = await getCollection('users');
-      await users.updateOne(
-        { id: userId },
-        { $inc: { totalTokens: reward } }
-      );
+      // Award tokens - get current user tokens first
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('total_tokens')
+        .eq('id', userId)
+        .single();
       
-      const user = await users.findOne({ id: userId });
+      if (userError) {
+        return NextResponse.json({ error: userError.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          total_tokens: (user.total_tokens || 0) + reward,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+      
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500, headers: corsHeaders });
+      }
       
       return NextResponse.json({
         success: true,
         reward,
-        totalTokens: user?.totalTokens || 0,
+        totalTokens: (user.total_tokens || 0) + reward,
         message: `Earned ${reward} VIDEO tokens!`
       }, { headers: corsHeaders });
     }

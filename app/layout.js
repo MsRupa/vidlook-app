@@ -5,8 +5,8 @@ export const metadata = {
   description: 'Watch YouTube videos and earn VIDEO tokens that you can convert to WLD. Powered by Worldcoin.',
   manifest: '/manifest.json',
   icons: {
-    icon: 'https://customer-assets.emergentagent.com/job_cabe8d93-16f6-41cd-861e-00383b6adf99/artifacts/mw0v55qa_vidlook-logo.png',
-    apple: 'https://customer-assets.emergentagent.com/job_cabe8d93-16f6-41cd-861e-00383b6adf99/artifacts/mw0v55qa_vidlook-logo.png',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
   appleWebApp: {
     capable: true,

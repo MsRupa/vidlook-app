@@ -30,7 +30,7 @@ import {
   Loader2
 } from 'lucide-react';
 
-const LOGO_URL = 'https://customer-assets.emergentagent.com/job_cabe8d93-16f6-41cd-861e-00383b6adf99/artifacts/mw0v55qa_vidlook-logo.png';
+const LOGO_URL = '/logo.png';
 
 // YouTube Player Component - Simple iframe approach
 function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
