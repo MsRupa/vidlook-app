@@ -32,111 +32,71 @@ import {
 
 const LOGO_URL = 'https://customer-assets.emergentagent.com/job_cabe8d93-16f6-41cd-861e-00383b6adf99/artifacts/mw0v55qa_vidlook-logo.png';
 
-// YouTube Player Component
+// YouTube Player Component - Simple iframe approach
 function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
-  const playerRef = useRef(null);
-  const intervalRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isReady, setIsReady] = useState(false);
+  const [watchTime, setWatchTime] = useState(0);
+  const intervalRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  // Use a simple approach: track time when user clicks play
+  const handleIframeClick = () => {
+    if (!isPlaying) {
+      setIsPlaying(true);
+      startTimeRef.current = Date.now();
+      if (onPlay) onPlay();
+      
+      // Track watch time
+      intervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setWatchTime(elapsed);
+        if (onTimeUpdate) onTimeUpdate(elapsed);
+      }, 1000);
+    }
+  };
 
   useEffect(() => {
-    // Load YouTube IFrame API
-    const loadYouTubeAPI = () => {
-      if (window.YT && window.YT.Player) {
-        initPlayer();
-        return;
-      }
-
-      if (!document.getElementById('youtube-api')) {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        tag.id = 'youtube-api';
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-      }
-
-      window.onYouTubeIframeAPIReady = () => {
-        initPlayer();
-      };
-    };
-
-    const initPlayer = () => {
-      if (!document.getElementById(`youtube-player-${videoId}`)) return;
-      
-      try {
-        playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
-          height: '100%',
-          width: '100%',
-          videoId: videoId,
-          playerVars: {
-            autoplay: 0,
-            controls: 1,
-            modestbranding: 1,
-            rel: 0,
-            showinfo: 0,
-            fs: 1,
-            playsinline: 1,
-            origin: window.location.origin
-          },
-          events: {
-            onReady: () => {
-              setIsReady(true);
-            },
-            onStateChange: (event) => {
-              if (event.data === window.YT.PlayerState.PLAYING) {
-                setIsPlaying(true);
-                if (onPlay) onPlay();
-                // Start time tracking
-                if (intervalRef.current) clearInterval(intervalRef.current);
-                intervalRef.current = setInterval(() => {
-                  if (playerRef.current && playerRef.current.getCurrentTime) {
-                    const time = playerRef.current.getCurrentTime();
-                    setCurrentTime(time);
-                    if (onTimeUpdate) onTimeUpdate(time);
-                  }
-                }, 1000);
-              } else {
-                setIsPlaying(false);
-                if (onPause) onPause();
-                if (intervalRef.current) {
-                  clearInterval(intervalRef.current);
-                }
-              }
-            }
-          }
-        });
-      } catch (err) {
-        console.error('Error initializing YouTube player:', err);
-      }
-    };
-
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(loadYouTubeAPI, 100);
-
     return () => {
-      clearTimeout(timer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      if (playerRef.current && playerRef.current.destroy) {
-        try {
-          playerRef.current.destroy();
-        } catch (e) {}
+    };
+  }, []);
+
+  // Use visibility API to pause tracking when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isPlaying) {
+        setIsPlaying(false);
+        if (onPause) onPause();
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
       }
     };
-  }, [videoId]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isPlaying, onPause]);
 
   return (
     <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
-      <div id={`youtube-player-${videoId}`} className="w-full h-full" />
-      {!isReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-          <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-        </div>
-      )}
+      <iframe
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`}
+        className="w-full h-full"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        title={`YouTube Video ${videoId}`}
+        onLoad={() => {}}
+      />
+      {/* Transparent overlay to detect interaction */}
+      <div 
+        className="absolute inset-0 cursor-pointer"
+        onClick={handleIframeClick}
+        style={{ pointerEvents: isPlaying ? 'none' : 'auto' }}
+      />
       {isPlaying && isActive && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse">
+        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10">
           <div className="w-2 h-2 bg-white rounded-full" />
           Earning VIDEO
         </div>
