@@ -172,7 +172,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
       {isPlaying && isActive && (
         <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
           <div className="w-2 h-2 bg-white rounded-full" />
-          Earning VIDEO
+          Earning $VIDEO
         </div>
       )}
     </div>
@@ -189,9 +189,10 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, ti
     setWatchTime(Math.floor(time));
     const currentMinute = Math.floor(time / 60);
     
-    // Award 2 tokens per minute
+    // Award 5 tokens per minute for sponsored videos, 2 for regular videos
+    const tokensPerMinute = isSponsored ? 5 : 2;
     if (currentMinute > lastRecordedMinuteRef.current) {
-      const newTokens = (currentMinute - lastRecordedMinuteRef.current) * 2;
+      const newTokens = (currentMinute - lastRecordedMinuteRef.current) * tokensPerMinute;
       setSessionTokens(prev => prev + newTokens);
       lastRecordedMinuteRef.current = currentMinute;
       
@@ -200,7 +201,7 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, ti
         onWatch(videoId, Math.floor(time), newTokens);
       }
     }
-  }, [videoId, onWatch]);
+  }, [videoId, onWatch, isSponsored]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -232,7 +233,7 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, ti
           </div>
           {sessionTokens > 0 && (
             <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
-              +{sessionTokens} VIDEO
+              +{sessionTokens} $VIDEO
             </Badge>
           )}
         </div>
@@ -352,8 +353,8 @@ function WelcomeScreen({ onConnect }) {
               <Coins className="w-5 h-5 text-orange-500" />
             </div>
             <div className="text-left">
-              <p className="text-white font-semibold">Earn VIDEO Tokens</p>
-              <p className="text-gray-400 text-sm">2 VIDEO per minute watched</p>
+              <p className="text-white font-semibold">Earn $VIDEO Tokens</p>
+              <p className="text-gray-400 text-sm">2 $VIDEO per minute watched</p>
             </div>
           </div>
 
@@ -363,7 +364,7 @@ function WelcomeScreen({ onConnect }) {
             </div>
             <div className="text-left">
               <p className="text-white font-semibold">Convert to WLD</p>
-              <p className="text-gray-400 text-sm">1000 VIDEO = 1 WLD</p>
+              <p className="text-gray-400 text-sm">1000 $VIDEO = 1 WLD</p>
             </div>
           </div>
         </div>
@@ -502,7 +503,7 @@ function HomeScreen({ user, onTokensEarned }) {
           <img src={LOGO_URL} alt="VidLook" className="w-8 h-8" />
           <h1 className="text-xl font-bold text-white">VidLook</h1>
           <Badge className="ml-auto bg-gradient-to-r from-red-500 to-orange-500 text-white">
-            {user?.totalTokens?.toLocaleString() || 0} VIDEO
+            {user?.totalTokens?.toLocaleString() || 0} $VIDEO
           </Badge>
         </div>
 
@@ -729,7 +730,7 @@ function ProfileScreen({ user, onTokensEarned }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1">
                 <Coins className="w-4 h-4" />
-                <span className="text-xs">VIDEO Balance</span>
+                <span className="text-xs">$VIDEO Balance</span>
               </div>
               <p className="text-2xl font-bold text-white">{user?.totalTokens?.toLocaleString() || 0}</p>
             </CardContent>
@@ -781,7 +782,7 @@ function ProfileScreen({ user, onTokensEarned }) {
                   <span className="text-2xl">{task.icon}</span>
                   <div className="flex-1">
                     <p className="text-white font-medium">{task.name}</p>
-                    <p className="text-sm text-gray-400">+{task.reward} VIDEO</p>
+                    <p className="text-sm text-gray-400">+{task.reward} $VIDEO</p>
                   </div>
                   {task.completed ? (
                     <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -879,12 +880,12 @@ function ConvertScreen({ user, onTokensUpdate }) {
     setSuccess('');
     
     if (!videoTokens || videoTokens < 5000) {
-      setError('Minimum conversion is 5000 VIDEO tokens');
+      setError('Minimum conversion is 5000 $VIDEO tokens');
       return;
     }
     
     if (videoTokens > (user?.totalTokens || 0)) {
-      setError('Insufficient VIDEO tokens');
+      setError('Insufficient $VIDEO tokens');
       return;
     }
 
@@ -901,7 +902,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
       if (data.error) {
         setError(data.error);
       } else {
-        setSuccess(`Successfully converted ${videoTokens} VIDEO to ${data.wldAmount} WLD!`);
+        setSuccess(`Successfully converted ${videoTokens} $VIDEO to ${data.wldAmount} WLD!`);
         setAmount('');
         if (onTokensUpdate) {
           onTokensUpdate(data.remainingTokens);
@@ -928,7 +929,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
           <ArrowRightLeft className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-2xl font-bold text-white">Convert Tokens</h1>
-        <p className="text-gray-400 mt-1">1000 VIDEO = 1 WLD</p>
+        <p className="text-gray-400 mt-1">1000 $VIDEO = 1 WLD</p>
       </div>
 
       {/* Balance Card */}
@@ -936,7 +937,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
         <CardContent className="p-6 text-center">
           <p className="text-gray-400 text-sm mb-1">Available Balance</p>
           <p className="text-4xl font-bold text-white">{user?.totalTokens?.toLocaleString() || 0}</p>
-          <p className="text-red-500 font-medium">VIDEO Tokens</p>
+          <p className="text-red-500 font-medium">$VIDEO Tokens</p>
         </CardContent>
       </Card>
 
@@ -949,7 +950,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter VIDEO amount"
+              placeholder="Enter $VIDEO amount"
               className="bg-gray-800 border-gray-700 text-white text-lg h-14"
             />
           </div>
@@ -1014,7 +1015,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
           </Button>
 
           <p className="text-center text-gray-500 text-xs">
-            Minimum conversion: 5000 VIDEO tokens
+            Minimum conversion: 5000 $VIDEO tokens
           </p>
         </CardContent>
       </Card>
@@ -1040,7 +1041,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
               <Card key={conv.id || index} className="bg-gray-900 border-gray-800">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div>
-                    <p className="text-white font-medium">{conv.videoTokens?.toLocaleString()} VIDEO</p>
+                    <p className="text-white font-medium">{conv.videoTokens?.toLocaleString()} $VIDEO</p>
                     <p className="text-gray-500 text-xs">
                       {new Date(conv.timestamp).toLocaleDateString()}
                     </p>
