@@ -1124,7 +1124,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
             </button>
             {expandedFaq === 3 && (
               <div className="px-4 pb-4">
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-400 text-sm whitespace-pre-line">
                   {txt.faq3Answer}
                 </p>
               </div>
