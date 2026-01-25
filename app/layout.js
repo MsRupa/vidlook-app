@@ -1,4 +1,5 @@
 import './globals.css'
+import Script from 'next/script'
 
 export const metadata = {
   title: 'VidLook - Watch YouTube & Earn WLD',
@@ -33,6 +34,20 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#000000" />
         <link rel="preconnect" href="https://www.youtube.com" />
         <link rel="preconnect" href="https://www.google.com" />
+        
+        {/* Google Analytics */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-JX2DBW24CW"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-JX2DBW24CW');
+          `}
+        </Script>
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <div className="max-w-md mx-auto min-h-screen relative">
