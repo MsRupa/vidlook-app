@@ -32,71 +32,126 @@ import {
 
 const LOGO_URL = '/logo.png';
 
-// YouTube Player Component - Simple iframe approach
+// YouTube Player Component - Using YouTube IFrame API for accurate play/pause detection
 function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
+  const [apiReady, setApiReady] = useState(false);
   const intervalRef = useRef(null);
-  const startTimeRef = useRef(null);
+  const playerRef = useRef(null);
+  const containerRef = useRef(null);
+  const accumulatedTimeRef = useRef(0);
+  const lastTickRef = useRef(null);
 
-  // Use a simple approach: track time when user clicks play
-  const handleIframeClick = () => {
-    if (!isPlaying) {
-      setIsPlaying(true);
-      startTimeRef.current = Date.now();
-      if (onPlay) onPlay();
-      
-      // Track watch time
-      intervalRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-        setWatchTime(elapsed);
-        if (onTimeUpdate) onTimeUpdate(elapsed);
-      }, 1000);
-    }
-  };
-
+  // Load YouTube IFrame API
   useEffect(() => {
+    // Check if API is already loaded
+    if (window.YT && window.YT.Player) {
+      setApiReady(true);
+      return;
+    }
+
+    // Load the API script if not already loading
+    if (!window.onYouTubeIframeAPIReady) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+
+    // Set up callback
+    const previousCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (previousCallback) previousCallback();
+      setApiReady(true);
+    };
+
+    // Check if already ready (race condition)
+    if (window.YT && window.YT.Player) {
+      setApiReady(true);
+    }
+  }, []);
+
+  // Initialize player when API is ready
+  useEffect(() => {
+    if (!apiReady || !containerRef.current || playerRef.current) return;
+
+    playerRef.current = new window.YT.Player(containerRef.current, {
+      videoId: videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        modestbranding: 1,
+        rel: 0,
+        playsinline: 1,
+      },
+      events: {
+        onStateChange: (event) => {
+          // YouTube Player States:
+          // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+          if (event.data === window.YT.PlayerState.PLAYING) {
+            setIsPlaying(true);
+            lastTickRef.current = Date.now();
+            if (onPlay) onPlay();
+            
+            // Start tracking time
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(() => {
+              const now = Date.now();
+              const delta = (now - lastTickRef.current) / 1000;
+              lastTickRef.current = now;
+              accumulatedTimeRef.current += delta;
+              const totalTime = Math.floor(accumulatedTimeRef.current);
+              setWatchTime(totalTime);
+              if (onTimeUpdate) onTimeUpdate(totalTime);
+            }, 1000);
+          } else if (event.data === window.YT.PlayerState.PAUSED || 
+                     event.data === window.YT.PlayerState.ENDED ||
+                     event.data === window.YT.PlayerState.BUFFERING) {
+            setIsPlaying(false);
+            if (onPause) onPause();
+            
+            // Stop tracking time
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+          }
+        },
+      },
+    });
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      if (playerRef.current && playerRef.current.destroy) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
     };
-  }, []);
+  }, [apiReady, videoId, onTimeUpdate, onPlay, onPause]);
 
-  // Use visibility API to pause tracking when tab is hidden
+  // Handle visibility change - pause tracking when tab is hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden && isPlaying) {
-        setIsPlaying(false);
-        if (onPause) onPause();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        // Pause the video when tab is hidden
+        if (playerRef.current && playerRef.current.pauseVideo) {
+          playerRef.current.pauseVideo();
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isPlaying, onPause]);
+  }, [isPlaying]);
 
   return (
     <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
-      <iframe
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=0&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`}
-        className="w-full h-full"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        title={`YouTube Video ${videoId}`}
-        onLoad={() => {}}
-      />
-      {/* Transparent overlay to detect interaction */}
-      <div 
-        className="absolute inset-0 cursor-pointer"
-        onClick={handleIframeClick}
-        style={{ pointerEvents: isPlaying ? 'none' : 'auto' }}
-      />
+      <div ref={containerRef} className="w-full h-full" />
       {isPlaying && isActive && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10">
+        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
           <div className="w-2 h-2 bg-white rounded-full" />
           Earning VIDEO
         </div>
