@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { translations, LANGUAGES, getLanguageFromCountry, t } from '@/lib/translations';
 import { 
   Home, 
   User, 
@@ -32,7 +33,8 @@ import {
   Loader2,
   LogOut,
   HelpCircle,
-  Mail
+  Mail,
+  Globe
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -394,9 +396,12 @@ function VideoCardSkeleton() {
 }
 
 // Welcome Screen
-function WelcomeScreen({ onConnect }) {
+function WelcomeScreen({ onConnect, language, onLanguageChange }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [detectedCountry, setDetectedCountry] = useState(null);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+
+  const txt = translations[language]?.welcome || translations['en'].welcome;
 
   // Pre-detect country while user is viewing the welcome screen
   useEffect(() => {
@@ -407,6 +412,12 @@ function WelcomeScreen({ onConnect }) {
         if (data.country) {
           setDetectedCountry(data.country);
           console.log('Pre-detected country:', data.country);
+          
+          // Auto-set language based on country
+          const detectedLang = getLanguageFromCountry(data.country);
+          if (detectedLang !== 'en') {
+            onLanguageChange(detectedLang);
+          }
         }
       } catch (e) {
         console.log('Country pre-detection failed');
@@ -429,6 +440,8 @@ function WelcomeScreen({ onConnect }) {
     onConnect(mockWallet, detectedCountry);
   };
 
+  const currentLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col items-center justify-center p-6">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -450,7 +463,7 @@ function WelcomeScreen({ onConnect }) {
             Vid<span className="text-red-500">Look</span>
           </h1>
           <p className="text-xl text-gray-400 font-medium">
-            Watch YouTube & Earn WLD
+            {txt.tagline}
           </p>
         </div>
 
@@ -461,8 +474,8 @@ function WelcomeScreen({ onConnect }) {
               <Play className="w-5 h-5 text-red-500" />
             </div>
             <div className="text-left">
-              <p className="text-white font-semibold">Watch Videos</p>
-              <p className="text-gray-400 text-sm">Discover trending content</p>
+              <p className="text-white font-semibold">{txt.feature1Title}</p>
+              <p className="text-gray-400 text-sm">{txt.feature1Desc}</p>
             </div>
           </div>
 
@@ -471,8 +484,8 @@ function WelcomeScreen({ onConnect }) {
               <Coins className="w-5 h-5 text-orange-500" />
             </div>
             <div className="text-left">
-              <p className="text-white font-semibold">Earn $VIDEO Tokens</p>
-              <p className="text-gray-400 text-sm">2 $VIDEO per minute watched</p>
+              <p className="text-white font-semibold">{txt.feature2Title}</p>
+              <p className="text-gray-400 text-sm">{txt.feature2Desc}</p>
             </div>
           </div>
 
@@ -481,8 +494,8 @@ function WelcomeScreen({ onConnect }) {
               <ArrowRightLeft className="w-5 h-5 text-green-500" />
             </div>
             <div className="text-left">
-              <p className="text-white font-semibold">Convert to WLD</p>
-              <p className="text-gray-400 text-sm">1000 $VIDEO = 1 WLD</p>
+              <p className="text-white font-semibold">{txt.feature3Title}</p>
+              <p className="text-gray-400 text-sm">{txt.feature3Desc}</p>
             </div>
           </div>
         </div>
@@ -496,26 +509,58 @@ function WelcomeScreen({ onConnect }) {
           {isConnecting ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Connecting...
+              {txt.connecting}
             </>
           ) : (
             <>
               <Wallet className="w-5 h-5 mr-2" />
-              Connect Wallet
+              {txt.connectWallet}
             </>
           )}
         </Button>
 
-        <p className="text-gray-500 text-sm">
-          Powered by Worldcoin
-        </p>
+        {/* Language Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+            className="flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-gray-800/50 hover:bg-gray-700/50 transition text-gray-300"
+          >
+            <Globe className="w-4 h-4" />
+            <span className="text-lg">{currentLang.flag}</span>
+            <span>{currentLang.name}</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showLanguageDropdown && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl z-50">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => {
+                    onLanguageChange(lang.code);
+                    setShowLanguageDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${
+                    language === lang.code ? 'bg-gray-700' : ''
+                  }`}
+                >
+                  <span className="text-xl">{lang.flag}</span>
+                  <span className="text-white">{lang.name}</span>
+                  {language === lang.code && (
+                    <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 // Home Screen (Video Feed)
-function HomeScreen({ user, onTokensEarned }) {
+function HomeScreen({ user, onTokensEarned, language }) {
   const [videos, setVideos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -525,6 +570,8 @@ function HomeScreen({ user, onTokensEarned }) {
   const [hasMore, setHasMore] = useState(true);
   const observerRef = useRef(null);
   const loadMoreRef = useRef(null);
+
+  const txt = translations[language]?.home || translations['en'].home;
 
   // Load initial videos
   useEffect(() => {
@@ -632,7 +679,7 @@ function HomeScreen({ user, onTokensEarned }) {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search videos..."
+              placeholder={txt.searchPlaceholder}
               className="pl-10 pr-10 bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 rounded-xl"
             />
             {searchQuery && (
@@ -659,10 +706,10 @@ function HomeScreen({ user, onTokensEarned }) {
       {searchResults.length > 0 && (
         <div className="px-4 py-3 bg-gray-900/50 flex items-center justify-between">
           <p className="text-gray-400 text-sm">
-            {searchResults.length} results for "{searchQuery}"
+            {txt.resultsFor.replace('{count}', searchResults.length).replace('{query}', searchQuery)}
           </p>
           <Button variant="ghost" size="sm" onClick={clearSearch} className="text-red-500">
-            Clear
+            {txt.clear}
           </Button>
         </div>
       )}
@@ -675,7 +722,7 @@ function HomeScreen({ user, onTokensEarned }) {
             {isLoading ? (
               <Skeleton className="h-5 w-40 bg-gray-700 inline-block" />
             ) : (
-              `Trending in ${COUNTRY_NAMES[user?.country] || user?.country || 'your region'}`
+              txt.trendingIn.replace('{country}', COUNTRY_NAMES[user?.country] || user?.country || txt.yourRegion)
             )}
           </h2>
         </div>
@@ -740,13 +787,15 @@ function HomeScreen({ user, onTokensEarned }) {
 }
 
 // Profile Screen
-function ProfileScreen({ user, onTokensEarned, onLogout }) {
+function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   const [stats, setStats] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState(null);
   const [expandedFaq, setExpandedFaq] = useState(null);
+
+  const txt = translations[language]?.profile || translations['en'].profile;
 
   useEffect(() => {
     if (user?.id) {
@@ -932,7 +981,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 px-3 py-2 flex items-center gap-2"
           >
             <LogOut className="w-4 h-4" />
-            <span>Logout</span>
+            <span>{txt.logout}</span>
           </Button>
         </div>
 
@@ -942,7 +991,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1">
                 <Coins className="w-4 h-4" />
-                <span className="text-xs">$VIDEO Balance</span>
+                <span className="text-xs">{txt.videoBalance}</span>
               </div>
               <p className="text-2xl font-bold text-white">{user?.totalTokens?.toLocaleString() || 0}</p>
             </CardContent>
@@ -951,7 +1000,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1">
                 <Clock className="w-4 h-4" />
-                <span className="text-xs">Watch Time</span>
+                <span className="text-xs">{txt.watchTime}</span>
               </div>
               <p className="text-2xl font-bold text-white">{formatTime(stats?.totalWatchTimeSeconds || 0)}</p>
             </CardContent>
@@ -960,7 +1009,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1">
                 <TrendingUp className="w-4 h-4" />
-                <span className="text-xs">Total Earned</span>
+                <span className="text-xs">{txt.totalEarned}</span>
               </div>
               <p className="text-2xl font-bold text-green-500">{stats?.totalTokensEarned?.toLocaleString() || 0}</p>
             </CardContent>
@@ -969,7 +1018,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1">
                 <Calendar className="w-4 h-4" />
-                <span className="text-xs">Joined</span>
+                <span className="text-xs">{txt.joined}</span>
               </div>
               <p className="text-sm font-bold text-white">
                 {user?.joinedAt ? new Date(user.joinedAt).toLocaleDateString() : 'Today'}
@@ -983,7 +1032,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <Gift className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-bold text-white">Tasks & Rewards</h3>
+          <h3 className="text-lg font-bold text-white">{txt.tasksRewards}</h3>
         </div>
 
         <div className="space-y-3">
@@ -1008,7 +1057,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
                       {completingTask === task.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        'Claim'
+                        txt.claim
                       )}
                     </Button>
                   )}
@@ -1023,7 +1072,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <HelpCircle className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-bold text-white">FAQ</h3>
+          <h3 className="text-lg font-bold text-white">{txt.faq}</h3>
         </div>
 
         <div className="space-y-3">
@@ -1033,14 +1082,14 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
               onClick={() => setExpandedFaq(expandedFaq === 1 ? null : 1)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
-              <p className="text-white font-medium">How do I contact the VidLook team?</p>
+              <p className="text-white font-medium">{txt.faq1Question}</p>
               <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 1 ? 'rotate-180' : ''}`} />
             </button>
             {expandedFaq === 1 && (
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  Email us at <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
+                  {txt.faq1Answer} <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
                 </p>
               </div>
             )}
@@ -1052,13 +1101,13 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
               onClick={() => setExpandedFaq(expandedFaq === 2 ? null : 2)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
-              <p className="text-white font-medium">When will I receive my converted WLDs?</p>
+              <p className="text-white font-medium">{txt.faq2Question}</p>
               <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 2 ? 'rotate-180' : ''}`} />
             </button>
             {expandedFaq === 2 && (
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm">
-                  WLDs are sent directly to your connected wallet within 24 hours of conversion.
+                  {txt.faq2Answer}
                 </p>
               </div>
             )}
@@ -1070,14 +1119,13 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
               onClick={() => setExpandedFaq(expandedFaq === 3 ? null : 3)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
-              <p className="text-white font-medium">What is the earning rate for videos?</p>
+              <p className="text-white font-medium">{txt.faq3Question}</p>
               <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 3 ? 'rotate-180' : ''}`} />
             </button>
             {expandedFaq === 3 && (
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm">
-                  <span className="text-yellow-500 font-medium">Sponsored videos:</span> 5 $VIDEO per minute<br />
-                  <span className="text-gray-300 font-medium">Regular videos:</span> 2 $VIDEO per minute
+                  {txt.faq3Answer}
                 </p>
               </div>
             )}
@@ -1089,15 +1137,15 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <Clock className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-bold text-white">Recent Activity</h3>
+          <h3 className="text-lg font-bold text-white">{txt.recentActivity}</h3>
         </div>
 
         {history.length === 0 ? (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="p-8 text-center">
               <Play className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No watch history yet</p>
-              <p className="text-gray-500 text-sm">Start watching to earn tokens!</p>
+              <p className="text-gray-400">{txt.noHistory}</p>
+              <p className="text-gray-500 text-sm">{txt.startWatching}</p>
             </CardContent>
           </Card>
         ) : (
@@ -1128,13 +1176,15 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
 }
 
 // Convert Screen
-function ConvertScreen({ user, onTokensUpdate }) {
+function ConvertScreen({ user, onTokensUpdate, language }) {
   const [amount, setAmount] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [conversions, setConversions] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [confirmationWld, setConfirmationWld] = useState(null);
+
+  const txt = translations[language]?.convert || translations['en'].convert;
 
   useEffect(() => {
     if (user?.id) {
@@ -1215,8 +1265,8 @@ function ConvertScreen({ user, onTokensUpdate }) {
           <ArrowRightLeft className="w-7 h-7 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-white">Convert Tokens</h1>
-          <p className="text-gray-400 text-sm">1000 $VIDEO = 1 WLD</p>
+          <h1 className="text-xl font-bold text-white">{txt.title}</h1>
+          <p className="text-gray-400 text-sm">{txt.rate}</p>
         </div>
       </div>
 
@@ -1226,7 +1276,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
           <CardContent className="p-4 text-center">
             <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
             <p className="text-green-500 font-medium">
-              You will receive {confirmationWld} WLD within 24 hours
+              {txt.confirmationMsg.replace('{amount}', confirmationWld)}
             </p>
           </CardContent>
         </Card>
@@ -1235,9 +1285,9 @@ function ConvertScreen({ user, onTokensUpdate }) {
       {/* Balance Card */}
       <Card className="bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/30 mb-6">
         <CardContent className="p-6 text-center">
-          <p className="text-gray-400 text-sm mb-1">Available Balance</p>
+          <p className="text-gray-400 text-sm mb-1">{txt.availableBalance}</p>
           <p className="text-4xl font-bold text-white">{user?.totalTokens?.toLocaleString() || 0}</p>
-          <p className="text-red-500 font-medium">$VIDEO Tokens</p>
+          <p className="text-red-500 font-medium">{txt.videoTokens}</p>
         </CardContent>
       </Card>
 
@@ -1245,12 +1295,12 @@ function ConvertScreen({ user, onTokensUpdate }) {
       <Card className="bg-gray-900 border-gray-800 mb-6">
         <CardContent className="p-6 space-y-4">
           <div>
-            <label className="text-gray-400 text-sm mb-2 block">Amount to Convert</label>
+            <label className="text-gray-400 text-sm mb-2 block">{txt.amountToConvert}</label>
             <Input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter $VIDEO amount"
+              placeholder={txt.enterAmount}
               className="bg-gray-800 border-gray-700 text-white text-lg h-14"
             />
           </div>
@@ -1275,7 +1325,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
               onClick={() => setAmount((user?.totalTokens || 0).toString())}
               className="border-red-500 text-red-500 hover:bg-red-500/10"
             >
-              Max
+              {txt.max}
             </Button>
           </div>
 
@@ -1283,7 +1333,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
 
           {/* Conversion Preview */}
           <div className="flex items-center justify-between py-2">
-            <span className="text-gray-400">You will receive</span>
+            <span className="text-gray-400">{txt.youWillReceive}</span>
             <span className="text-2xl font-bold text-green-500">{wldAmount} WLD</span>
           </div>
 
@@ -1307,15 +1357,15 @@ function ConvertScreen({ user, onTokensUpdate }) {
             {isConverting ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Converting...
+                {txt.converting}
               </>
             ) : (
-              'Convert to WLD'
+              txt.convertButton
             )}
           </Button>
 
           <p className="text-center text-gray-500 text-xs">
-            Minimum conversion: 5000 $VIDEO tokens
+            {txt.minimum}
           </p>
         </CardContent>
       </Card>
@@ -1324,15 +1374,15 @@ function ConvertScreen({ user, onTokensUpdate }) {
       <div>
         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <Trophy className="w-5 h-5 text-red-500" />
-          Conversion History
+          {txt.history}
         </h3>
 
         {conversions.length === 0 ? (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="p-8 text-center">
               <ArrowRightLeft className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-400">No conversions yet</p>
-              <p className="text-gray-500 text-sm">Convert your first tokens above!</p>
+              <p className="text-gray-400">{txt.noConversions}</p>
+              <p className="text-gray-500 text-sm">{txt.convertFirst}</p>
             </CardContent>
           </Card>
         ) : (
@@ -1366,11 +1416,13 @@ function ConvertScreen({ user, onTokensUpdate }) {
 }
 
 // Bottom Navigation
-function BottomNav({ activeTab, onTabChange }) {
+function BottomNav({ activeTab, onTabChange, language }) {
+  const txt = translations[language]?.nav || translations['en'].nav;
+  
   const tabs = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'convert', icon: ArrowRightLeft, label: 'Convert' },
-    { id: 'profile', icon: User, label: 'Profile' }
+    { id: 'home', icon: Home, label: txt.home },
+    { id: 'convert', icon: ArrowRightLeft, label: txt.convert },
+    { id: 'profile', icon: User, label: txt.profile }
   ];
 
   return (
@@ -1405,6 +1457,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [isLoading, setIsLoading] = useState(false);
+  const [language, setLanguage] = useState('en');
 
   const handleConnect = async (walletAddress, preDetectedCountry) => {
     setIsLoading(true);
@@ -1447,7 +1500,13 @@ export default function App() {
 
   // Not connected - show welcome
   if (!user) {
-    return <WelcomeScreen onConnect={handleConnect} />;
+    return (
+      <WelcomeScreen 
+        onConnect={handleConnect} 
+        language={language}
+        onLanguageChange={setLanguage}
+      />
+    );
   }
 
   return (
@@ -1456,6 +1515,7 @@ export default function App() {
         <HomeScreen 
           user={user} 
           onTokensEarned={handleTokensUpdate}
+          language={language}
         />
       )}
       
@@ -1463,6 +1523,7 @@ export default function App() {
         <ConvertScreen 
           user={user}
           onTokensUpdate={handleTokensUpdate}
+          language={language}
         />
       )}
       
@@ -1471,12 +1532,14 @@ export default function App() {
           user={user}
           onTokensEarned={handleTokensUpdate}
           onLogout={() => setUser(null)}
+          language={language}
         />
       )}
 
       <BottomNav 
         activeTab={activeTab} 
-        onTabChange={setActiveTab} 
+        onTabChange={setActiveTab}
+        language={language}
       />
     </div>
   );
