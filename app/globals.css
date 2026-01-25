@@ -124,6 +124,35 @@ body {
   border: 0;
 }
 
+/* YouTube iframe fullscreen styles - ensure landscape orientation */
+iframe:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
+iframe:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
+iframe:-moz-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
+iframe:-ms-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
 /* Custom scrollbar for scroll areas */
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;

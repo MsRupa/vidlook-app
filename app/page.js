@@ -33,6 +33,48 @@ import {
 
 const LOGO_URL = '/logo.png';
 
+// Country code to name mapping
+const COUNTRY_NAMES = {
+  'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
+  'AR': 'Argentina', 'AM': 'Armenia', 'AU': 'Australia', 'AT': 'Austria', 'AZ': 'Azerbaijan',
+  'BH': 'Bahrain', 'BD': 'Bangladesh', 'BY': 'Belarus', 'BE': 'Belgium', 'BZ': 'Belize',
+  'BJ': 'Benin', 'BT': 'Bhutan', 'BO': 'Bolivia', 'BA': 'Bosnia and Herzegovina', 'BW': 'Botswana',
+  'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria', 'BF': 'Burkina Faso', 'BI': 'Burundi',
+  'KH': 'Cambodia', 'CM': 'Cameroon', 'CA': 'Canada', 'CV': 'Cape Verde', 'CF': 'Central African Republic',
+  'TD': 'Chad', 'CL': 'Chile', 'CN': 'China', 'CO': 'Colombia', 'KM': 'Comoros',
+  'CG': 'Congo', 'CD': 'DR Congo', 'CR': 'Costa Rica', 'CI': 'Ivory Coast', 'HR': 'Croatia',
+  'CU': 'Cuba', 'CY': 'Cyprus', 'CZ': 'Czech Republic', 'DK': 'Denmark', 'DJ': 'Djibouti',
+  'DO': 'Dominican Republic', 'EC': 'Ecuador', 'EG': 'Egypt', 'SV': 'El Salvador', 'GQ': 'Equatorial Guinea',
+  'ER': 'Eritrea', 'EE': 'Estonia', 'SZ': 'Eswatini', 'ET': 'Ethiopia', 'FJ': 'Fiji',
+  'FI': 'Finland', 'FR': 'France', 'GA': 'Gabon', 'GM': 'Gambia', 'GE': 'Georgia',
+  'DE': 'Germany', 'GH': 'Ghana', 'GR': 'Greece', 'GT': 'Guatemala', 'GN': 'Guinea',
+  'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti', 'HN': 'Honduras', 'HK': 'Hong Kong',
+  'HU': 'Hungary', 'IS': 'Iceland', 'IN': 'India', 'ID': 'Indonesia', 'IR': 'Iran',
+  'IQ': 'Iraq', 'IE': 'Ireland', 'IL': 'Israel', 'IT': 'Italy', 'JM': 'Jamaica',
+  'JP': 'Japan', 'JO': 'Jordan', 'KZ': 'Kazakhstan', 'KE': 'Kenya', 'KW': 'Kuwait',
+  'KG': 'Kyrgyzstan', 'LA': 'Laos', 'LV': 'Latvia', 'LB': 'Lebanon', 'LS': 'Lesotho',
+  'LR': 'Liberia', 'LY': 'Libya', 'LI': 'Liechtenstein', 'LT': 'Lithuania', 'LU': 'Luxembourg',
+  'MO': 'Macau', 'MG': 'Madagascar', 'MW': 'Malawi', 'MY': 'Malaysia', 'MV': 'Maldives',
+  'ML': 'Mali', 'MT': 'Malta', 'MR': 'Mauritania', 'MU': 'Mauritius', 'MX': 'Mexico',
+  'MD': 'Moldova', 'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro', 'MA': 'Morocco',
+  'MZ': 'Mozambique', 'MM': 'Myanmar', 'NA': 'Namibia', 'NP': 'Nepal', 'NL': 'Netherlands',
+  'NZ': 'New Zealand', 'NI': 'Nicaragua', 'NE': 'Niger', 'NG': 'Nigeria', 'KP': 'North Korea',
+  'MK': 'North Macedonia', 'NO': 'Norway', 'OM': 'Oman', 'PK': 'Pakistan', 'PA': 'Panama',
+  'PG': 'Papua New Guinea', 'PY': 'Paraguay', 'PE': 'Peru', 'PH': 'Philippines', 'PL': 'Poland',
+  'PT': 'Portugal', 'PR': 'Puerto Rico', 'QA': 'Qatar', 'RO': 'Romania', 'RU': 'Russia',
+  'RW': 'Rwanda', 'SA': 'Saudi Arabia', 'SN': 'Senegal', 'RS': 'Serbia', 'SG': 'Singapore',
+  'SK': 'Slovakia', 'SI': 'Slovenia', 'SO': 'Somalia', 'ZA': 'South Africa', 'KR': 'South Korea',
+  'SS': 'South Sudan', 'ES': 'Spain', 'LK': 'Sri Lanka', 'SD': 'Sudan', 'SR': 'Suriname',
+  'SE': 'Sweden', 'CH': 'Switzerland', 'SY': 'Syria', 'TW': 'Taiwan', 'TJ': 'Tajikistan',
+  'TZ': 'Tanzania', 'TH': 'Thailand', 'TL': 'Timor-Leste', 'TG': 'Togo', 'TT': 'Trinidad and Tobago',
+  'TN': 'Tunisia', 'TR': 'Turkey', 'TM': 'Turkmenistan', 'UG': 'Uganda', 'UA': 'Ukraine',
+  'AE': 'United Arab Emirates', 'GB': 'United Kingdom', 'US': 'United States', 'UY': 'Uruguay',
+  'UZ': 'Uzbekistan', 'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen', 'ZM': 'Zambia', 'ZW': 'Zimbabwe'
+};
+
+// Global registry to track all player instances for single-video playback
+const playerRegistry = new Map();
+
 // YouTube Player Component - Using YouTube IFrame API for accurate play/pause detection
 function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -41,6 +83,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   const intervalRef = useRef(null);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
   const accumulatedTimeRef = useRef(0);
   const lastTickRef = useRef(null);
   
@@ -85,6 +128,19 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
     }
   }, []);
 
+  // Pause all other players when this one starts playing
+  const pauseOtherPlayers = useCallback(() => {
+    playerRegistry.forEach((player, id) => {
+      if (id !== videoId && player && player.pauseVideo) {
+        try {
+          player.pauseVideo();
+        } catch (e) {
+          console.warn('Failed to pause player:', id);
+        }
+      }
+    });
+  }, [videoId]);
+
   // Initialize player when API is ready
   useEffect(() => {
     if (!apiReady || !containerRef.current || playerRef.current) return;
@@ -105,10 +161,17 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
         playsinline: 1,
       },
       events: {
+        onReady: () => {
+          // Register player in the global registry
+          playerRegistry.set(videoId, playerRef.current);
+        },
         onStateChange: (event) => {
           // YouTube Player States:
           // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
           if (event.data === window.YT.PlayerState.PLAYING) {
+            // Pause all other players before this one starts
+            pauseOtherPlayers();
+            
             setIsPlaying(true);
             lastTickRef.current = Date.now();
             if (onPlayRef.current) onPlayRef.current();
@@ -141,6 +204,9 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
     });
 
     return () => {
+      // Remove from registry
+      playerRegistry.delete(videoId);
+      
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -149,7 +215,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
         playerRef.current = null;
       }
     };
-  }, [apiReady, videoId]); // Only re-create player when videoId changes, not when callbacks change
+  }, [apiReady, videoId, pauseOtherPlayers]); // Only re-create player when videoId changes, not when callbacks change
 
   // Handle visibility change - pause tracking when tab is hidden
   useEffect(() => {
@@ -166,8 +232,53 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying]);
 
+  // Handle fullscreen orientation lock for landscape mode
+  useEffect(() => {
+    const handleFullscreenChange = async () => {
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      if (isFullscreen) {
+        // Lock to landscape when entering fullscreen
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (e) {
+          // Orientation lock may not be supported or allowed
+          console.log('Could not lock orientation:', e.message);
+        }
+      } else {
+        // Unlock when exiting fullscreen
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        } catch (e) {
+          console.log('Could not unlock orientation:', e.message);
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
   return (
-    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
+    <div ref={wrapperRef} className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
       <div ref={containerRef} className="w-full h-full" />
       {isPlaying && isActive && (
         <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
@@ -557,7 +668,7 @@ function HomeScreen({ user, onTokensEarned }) {
             {isLoading ? (
               <Skeleton className="h-5 w-40 bg-gray-700 inline-block" />
             ) : (
-              `Trending in ${user?.country || 'your region'}`
+              `Trending in ${COUNTRY_NAMES[user?.country] || user?.country || 'your region'}`
             )}
           </h2>
         </div>
