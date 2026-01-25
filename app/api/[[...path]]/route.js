@@ -122,22 +122,25 @@ export async function GET(request, { params }) {
         return NextResponse.json({ error: 'Search query is required' }, { status: 400, headers: corsHeaders });
       }
       
-      const cacheKey = `youtube:search:${query.toLowerCase()}:${regionCode}`;
+      // Normalize query: lowercase, trim, collapse multiple spaces
+      const normalizedQuery = query.toLowerCase().trim().replace(/\s+/g, ' ');
+      const cacheKey = `youtube:search:${normalizedQuery}:${regionCode}`;
+      const SEARCH_CACHE_TTL = 86400; // 24 hours - same as trending
       
       // Try cache first
       let cachedData = await getCachedData(cacheKey);
       if (cachedData) {
-        console.log('Cache hit for:', query);
+        console.log('Search cache hit for:', normalizedQuery);
         const data = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
         return NextResponse.json(data, { headers: corsHeaders });
       }
       
       // Fetch from YouTube API
-      console.log('Cache miss for:', query);
+      console.log('Search cache miss for:', normalizedQuery);
       const youtubeData = await searchYoutubeVideos(query, 20, regionCode);
       
-      // Cache the results for 1 hour
-      await setCachedData(cacheKey, youtubeData, 3600);
+      // Cache the results for 24 hours
+      await setCachedData(cacheKey, youtubeData, SEARCH_CACHE_TTL);
       
       return NextResponse.json(youtubeData, { headers: corsHeaders });
     }

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Home, 
   User, 
@@ -234,6 +235,39 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, ti
               +{sessionTokens} VIDEO
             </Badge>
           )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Video Card Skeleton for loading state
+function VideoCardSkeleton() {
+  return (
+    <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4">
+      {/* Video thumbnail skeleton */}
+      <div className="relative w-full aspect-video bg-gray-800">
+        <Skeleton className="absolute inset-0 bg-gray-700" />
+        {/* Play button overlay skeleton */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-gray-600/50 flex items-center justify-center">
+            <Skeleton className="w-8 h-8 rounded-full bg-gray-500" />
+          </div>
+        </div>
+      </div>
+      <CardContent className="p-3 space-y-3">
+        {/* Title skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full bg-gray-700" />
+          <Skeleton className="h-4 w-3/4 bg-gray-700" />
+        </div>
+        {/* Footer skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4 rounded-full bg-gray-700" />
+            <Skeleton className="h-3 w-12 bg-gray-700" />
+          </div>
+          <Skeleton className="h-5 w-20 rounded-full bg-gray-700" />
         </div>
       </CardContent>
     </Card>
@@ -515,18 +549,34 @@ function HomeScreen({ user, onTokensEarned }) {
       )}
 
       {/* Trending Header */}
-      {searchResults.length === 0 && videos.length > 0 && (
+      {searchResults.length === 0 && !isSearching && (
         <div className="px-4 py-3 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-red-500" />
-          <h2 className="text-white font-bold">Trending in {user?.country || 'your region'}</h2>
+          <h2 className="text-white font-bold">
+            {isLoading ? (
+              <Skeleton className="h-5 w-40 bg-gray-700 inline-block" />
+            ) : (
+              `Trending in ${user?.country || 'your region'}`
+            )}
+          </h2>
         </div>
       )}
 
       {/* Video Feed */}
       <div className="px-4 py-4 space-y-4">
         {isLoading && videos.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+          // Skeleton UI for initial loading state
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <VideoCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : isSearching ? (
+          // Skeleton UI for search loading state
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <VideoCardSkeleton key={`search-skeleton-${i}`} />
+            ))}
           </div>
         ) : (
           <>
