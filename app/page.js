@@ -87,6 +87,12 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   // Initialize player when API is ready
   useEffect(() => {
     if (!apiReady || !containerRef.current || playerRef.current) return;
+    
+    // Don't create player if videoId is invalid
+    if (!videoId || typeof videoId !== 'string' || videoId.trim() === '') {
+      console.warn('Invalid videoId, skipping player creation');
+      return;
+    }
 
     playerRef.current = new window.YT.Player(containerRef.current, {
       videoId: videoId,
@@ -489,11 +495,13 @@ function HomeScreen({ user, onTokensEarned }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results
-              searchResults.map((video, index) => (
+              // Search Results - filter out items without valid videoId
+              searchResults
+                .filter(video => video.id?.videoId)
+                .map((video, index) => (
                 <VideoCard 
-                  key={video.id?.videoId || index}
-                  videoId={video.id?.videoId}
+                  key={video.id.videoId}
+                  videoId={video.id.videoId}
                   onWatch={handleWatch}
                 />
               ))
