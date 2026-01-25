@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   Circle,
   ChevronRight,
+  ChevronDown,
   Copy,
   ExternalLink,
   Coins,
@@ -29,7 +30,9 @@ import {
   Calendar,
   X,
   Loader2,
-  LogOut
+  LogOut,
+  HelpCircle,
+  Mail
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -829,16 +832,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
             {user?.username?.charAt(0)?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-white">{user?.username}</h2>
-              <button 
-                onClick={onLogout}
-                className="p-1.5 rounded-full bg-gray-800/50 hover:bg-red-500/20 transition"
-                title="Log out"
-              >
-                <LogOut className="w-4 h-4 text-gray-400 hover:text-red-500 transition" />
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-white">{user?.username}</h2>
             <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
               <span className="truncate max-w-[150px]">{user?.walletAddress?.slice(0, 10)}...{user?.walletAddress?.slice(-6)}</span>
               <button onClick={copyAddress}>
@@ -846,6 +840,14 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
               </button>
             </div>
           </div>
+          <Button 
+            onClick={onLogout}
+            variant="outline"
+            className="bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 px-4 py-2 flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Logout</span>
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -931,6 +933,45 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
         </div>
       </div>
 
+      {/* FAQ Section */}
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <HelpCircle className="w-5 h-5 text-red-500" />
+          <h3 className="text-lg font-bold text-white">FAQ</h3>
+        </div>
+
+        <div className="space-y-3">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="p-4">
+              <p className="text-white font-medium mb-2">How do I contact the VidLook team?</p>
+              <p className="text-gray-400 text-sm flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email us at <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="p-4">
+              <p className="text-white font-medium mb-2">When will I receive my converted WLDs?</p>
+              <p className="text-gray-400 text-sm">
+                WLDs are sent directly to your connected wallet within 24 hours of conversion.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="p-4">
+              <p className="text-white font-medium mb-2">What is the earning rate for videos?</p>
+              <p className="text-gray-400 text-sm">
+                <span className="text-yellow-500 font-medium">Sponsored videos:</span> 5 $VIDEO per minute<br />
+                <span className="text-gray-300 font-medium">Regular videos:</span> 2 $VIDEO per minute
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
       {/* Watch History */}
       <div className="p-4">
         <div className="flex items-center gap-2 mb-4">
@@ -948,7 +989,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
           </Card>
         ) : (
           <div className="space-y-2">
-            {history.slice(0, 10).map((item, index) => (
+            {history.slice(0, 5).map((item, index) => (
               <Card key={item.id || index} className="bg-gray-900 border-gray-800">
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
