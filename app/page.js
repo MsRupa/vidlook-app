@@ -796,6 +796,18 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   const [expandedFaq, setExpandedFaq] = useState(null);
 
   const txt = translations[language]?.profile || translations['en'].profile;
+  const taskTxt = translations[language]?.tasks || translations['en'].tasks;
+
+  // Map task IDs to translation keys
+  const getTaskName = (taskId, fallbackName) => {
+    const taskMap = {
+      'daily_login': taskTxt.dailyLogin,
+      'follow_x': taskTxt.followX,
+      'post_x': taskTxt.postX,
+      'watch_1hour': taskTxt.watch1Hour
+    };
+    return taskMap[taskId] || fallbackName;
+  };
 
   useEffect(() => {
     if (user?.id) {
@@ -1042,7 +1054,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{task.icon}</span>
                   <div className="flex-1">
-                    <p className="text-white font-medium">{task.name}</p>
+                    <p className="text-white font-medium">{getTaskName(task.id, task.name)}</p>
                     <p className="text-sm text-gray-400">+{task.reward} $VIDEO</p>
                   </div>
                   {task.completed ? (
