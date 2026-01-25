@@ -101,3 +101,156 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  VidLook - Worldcoin mini-app where users watch YouTube videos and earn VIDEO tokens.
+  - 2 VIDEO tokens per minute watched
+  - 1000 VIDEO = 1 WLD conversion rate
+  - Minimum conversion: 5000 VIDEO tokens
+  - Country-based video feed using country.is API
+  - YouTube search with Upstash Redis caching
+  - Tasks to earn extra tokens
+  - Profile screen with stats and history
+  - Mobile-native app feel
+
+backend:
+  - task: "User wallet connection API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/users/connect - creates/returns user with wallet address, username, country"
+
+  - task: "Video feed API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/videos/feed - returns curated video IDs by region with pagination"
+
+  - task: "Video search API with Redis caching"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/videos/search - searches YouTube API with Upstash Redis caching"
+
+  - task: "Watch record API (token earning)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/watch/record - records watch time and awards 2 VIDEO per 60 seconds"
+
+  - task: "Token conversion API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/convert - converts VIDEO to WLD at 1000:1, min 5000 VIDEO"
+
+  - task: "Task completion API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "POST /api/tasks/complete - completes tasks and awards VIDEO tokens"
+
+  - task: "User stats API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/stats/{userId} - returns total watch time, tokens earned, conversions"
+
+  - task: "Watch history API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/history/{userId} - returns watch history"
+
+  - task: "Conversion history API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/conversions/{userId} - returns conversion history"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "User wallet connection API"
+    - "Video feed API"
+    - "Video search API with Redis caching"
+    - "Watch record API (token earning)"
+    - "Token conversion API"
+    - "Task completion API"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Implemented VidLook backend APIs. Please test:
+      1. POST /api/users/connect - with body {walletAddress, username, country}
+      2. GET /api/videos/feed?region=US&page=1&limit=10
+      3. GET /api/videos/search?q=music&region=US (uses YouTube API with Redis cache)
+      4. POST /api/watch/record - with body {userId, videoId, watchedSeconds}
+      5. POST /api/convert - with body {userId, videoTokens} (min 5000)
+      6. POST /api/tasks/complete - with body {userId, taskId}
+      7. GET /api/stats/{userId}
+      8. GET /api/history/{userId}
+      9. GET /api/conversions/{userId}
+      10. GET /api/tasks/{userId}
