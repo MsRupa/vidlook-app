@@ -206,13 +206,10 @@ export async function GET(request, { params }) {
       }
       
       const allTasks = [
+        { id: 'daily_login', name: 'Daily login bonus', reward: 20, icon: '📅', daily: true },
         { id: 'follow_x', name: 'Follow us on X', reward: 100, icon: '🐦' },
         { id: 'post_x', name: 'Post about VidLook on X', reward: 200, icon: '📢' },
-        { id: 'first_video', name: 'Watch your first video', reward: 50, icon: '🎬' },
-        { id: 'watch_10', name: 'Watch 10 minutes total', reward: 100, icon: '⏱️' },
-        { id: 'watch_60', name: 'Watch 60 minutes total', reward: 500, icon: '🏆' },
-        { id: 'first_convert', name: 'Convert your first tokens', reward: 100, icon: '💱' },
-        { id: 'daily_login', name: 'Daily login bonus', reward: 20, icon: '📅', daily: true }
+        { id: 'watch_60', name: 'Watch 1 hour total', reward: 500, icon: '⏰' }
       ];
       
       const completedTaskIds = completedTasks.map(t => t.task_id);

@@ -28,7 +28,8 @@ import {
   TrendingUp,
   Calendar,
   X,
-  Loader2
+  Loader2,
+  LogOut
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -323,9 +324,12 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, ti
   return (
     <Card className={`overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4 ${isSponsored ? 'ring-2 ring-yellow-500/50' : ''}`}>
       {isSponsored && (
-        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center gap-1">
-          <span>⭐</span>
-          <span>SPONSORED</span>
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span>⭐</span>
+            <span>SPONSORED</span>
+          </div>
+          <span>Earn 5 $VIDEO per minute</span>
         </div>
       )}
       <YouTubePlayer 
@@ -733,7 +737,7 @@ function HomeScreen({ user, onTokensEarned }) {
 }
 
 // Profile Screen
-function ProfileScreen({ user, onTokensEarned }) {
+function ProfileScreen({ user, onTokensEarned, onLogout }) {
   const [stats, setStats] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [history, setHistory] = useState([]);
@@ -825,7 +829,16 @@ function ProfileScreen({ user, onTokensEarned }) {
             {user?.username?.charAt(0)?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-white">{user?.username}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-white">{user?.username}</h2>
+              <button 
+                onClick={onLogout}
+                className="p-1.5 rounded-full bg-gray-800/50 hover:bg-red-500/20 transition"
+                title="Log out"
+              >
+                <LogOut className="w-4 h-4 text-gray-400 hover:text-red-500 transition" />
+              </button>
+            </div>
             <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
               <span className="truncate max-w-[150px]">{user?.walletAddress?.slice(0, 10)}...{user?.walletAddress?.slice(-6)}</span>
               <button onClick={copyAddress}>
@@ -1275,6 +1288,7 @@ export default function App() {
         <ProfileScreen 
           user={user}
           onTokensEarned={handleTokensUpdate}
+          onLogout={() => setUser(null)}
         />
       )}
 
