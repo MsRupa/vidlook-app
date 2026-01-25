@@ -3,8 +3,6 @@ import './globals.css'
 export const metadata = {
   title: 'VidLook - Watch YouTube & Earn WLD',
   description: 'Watch YouTube videos and earn VIDEO tokens that you can convert to WLD. Powered by Worldcoin.',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
-  themeColor: '#000000',
   manifest: '/manifest.json',
   icons: {
     icon: 'https://customer-assets.emergentagent.com/job_cabe8d93-16f6-41cd-861e-00383b6adf99/artifacts/mw0v55qa_vidlook-logo.png',
@@ -15,6 +13,14 @@ export const metadata = {
     statusBarStyle: 'black-translucent',
     title: 'VidLook',
   },
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#000000',
 }
 
 export default function RootLayout({ children }) {
