@@ -1134,6 +1134,7 @@ function ConvertScreen({ user, onTokensUpdate }) {
   const [conversions, setConversions] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [confirmationWld, setConfirmationWld] = useState(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -1181,11 +1182,18 @@ function ConvertScreen({ user, onTokensUpdate }) {
         setError(data.error);
       } else {
         setSuccess(`Successfully converted ${videoTokens} $VIDEO to ${data.wldAmount} WLD!`);
+        setConfirmationWld(data.wldAmount);
         setAmount('');
         if (onTokensUpdate) {
           onTokensUpdate(data.remainingTokens);
         }
         loadConversions();
+        
+        // Clear confirmation after 1 minute
+        setTimeout(() => {
+          setConfirmationWld(null);
+          setSuccess('');
+        }, 60000);
       }
     } catch (error) {
       setError('Conversion failed. Please try again.');
@@ -1202,13 +1210,27 @@ function ConvertScreen({ user, onTokensUpdate }) {
   return (
     <div className="pb-24 p-4">
       {/* Header */}
-      <div className="text-center mb-6">
-        <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-          <ArrowRightLeft className="w-10 h-10 text-white" />
+      <div className="flex items-center gap-4 mb-6">
+        <div className="w-14 h-14 flex-shrink-0 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+          <ArrowRightLeft className="w-7 h-7 text-white" />
         </div>
-        <h1 className="text-2xl font-bold text-white">Convert Tokens</h1>
-        <p className="text-gray-400 mt-1">1000 $VIDEO = 1 WLD</p>
+        <div>
+          <h1 className="text-xl font-bold text-white">Convert Tokens</h1>
+          <p className="text-gray-400 text-sm">1000 $VIDEO = 1 WLD</p>
+        </div>
       </div>
+
+      {/* Confirmation Message */}
+      {confirmationWld && (
+        <Card className="bg-green-500/10 border-green-500/30 mb-6">
+          <CardContent className="p-4 text-center">
+            <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
+            <p className="text-green-500 font-medium">
+              You will receive {confirmationWld} WLD within 24 hours
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Balance Card */}
       <Card className="bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/30 mb-6">
@@ -1321,7 +1343,13 @@ function ConvertScreen({ user, onTokensUpdate }) {
                   <div>
                     <p className="text-white font-medium">{conv.videoTokens?.toLocaleString()} $VIDEO</p>
                     <p className="text-gray-500 text-xs">
-                      {new Date(conv.timestamp).toLocaleDateString()}
+                      {new Date(conv.timestamp).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
                     </p>
                   </div>
                   <div className="text-right">
