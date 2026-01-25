@@ -746,6 +746,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState(null);
+  const [expandedFaq, setExpandedFaq] = useState(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -828,13 +829,13 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
       {/* Profile Header */}
       <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 p-6">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-            {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+          <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white">
+            <User className="w-8 h-8" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-white">{user?.username}</h2>
+            <h2 className="text-xl font-bold text-white">@{user?.username}</h2>
             <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
-              <span className="truncate max-w-[150px]">{user?.walletAddress?.slice(0, 10)}...{user?.walletAddress?.slice(-6)}</span>
+              <span className="truncate">{user?.walletAddress?.slice(0, 6)}...{user?.walletAddress?.slice(-4)}</span>
               <button onClick={copyAddress}>
                 <Copy className="w-4 h-4 hover:text-white transition" />
               </button>
@@ -941,33 +942,60 @@ function ProfileScreen({ user, onTokensEarned, onLogout }) {
         </div>
 
         <div className="space-y-3">
-          <Card className="bg-gray-900 border-gray-800">
-            <CardContent className="p-4">
-              <p className="text-white font-medium mb-2">How do I contact the VidLook team?</p>
-              <p className="text-gray-400 text-sm flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                Email us at <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
-              </p>
-            </CardContent>
+          {/* FAQ 1 */}
+          <Card className="bg-gray-900 border-gray-800 overflow-hidden">
+            <button 
+              onClick={() => setExpandedFaq(expandedFaq === 1 ? null : 1)}
+              className="w-full p-4 flex items-center justify-between text-left"
+            >
+              <p className="text-white font-medium">How do I contact the VidLook team?</p>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 1 ? 'rotate-180' : ''}`} />
+            </button>
+            {expandedFaq === 1 && (
+              <div className="px-4 pb-4">
+                <p className="text-gray-400 text-sm flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  Email us at <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
+                </p>
+              </div>
+            )}
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
-            <CardContent className="p-4">
-              <p className="text-white font-medium mb-2">When will I receive my converted WLDs?</p>
-              <p className="text-gray-400 text-sm">
-                WLDs are sent directly to your connected wallet within 24 hours of conversion.
-              </p>
-            </CardContent>
+          {/* FAQ 2 */}
+          <Card className="bg-gray-900 border-gray-800 overflow-hidden">
+            <button 
+              onClick={() => setExpandedFaq(expandedFaq === 2 ? null : 2)}
+              className="w-full p-4 flex items-center justify-between text-left"
+            >
+              <p className="text-white font-medium">When will I receive my converted WLDs?</p>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 2 ? 'rotate-180' : ''}`} />
+            </button>
+            {expandedFaq === 2 && (
+              <div className="px-4 pb-4">
+                <p className="text-gray-400 text-sm">
+                  WLDs are sent directly to your connected wallet within 24 hours of conversion.
+                </p>
+              </div>
+            )}
           </Card>
 
-          <Card className="bg-gray-900 border-gray-800">
-            <CardContent className="p-4">
-              <p className="text-white font-medium mb-2">What is the earning rate for videos?</p>
-              <p className="text-gray-400 text-sm">
-                <span className="text-yellow-500 font-medium">Sponsored videos:</span> 5 $VIDEO per minute<br />
-                <span className="text-gray-300 font-medium">Regular videos:</span> 2 $VIDEO per minute
-              </p>
-            </CardContent>
+          {/* FAQ 3 */}
+          <Card className="bg-gray-900 border-gray-800 overflow-hidden">
+            <button 
+              onClick={() => setExpandedFaq(expandedFaq === 3 ? null : 3)}
+              className="w-full p-4 flex items-center justify-between text-left"
+            >
+              <p className="text-white font-medium">What is the earning rate for videos?</p>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 3 ? 'rotate-180' : ''}`} />
+            </button>
+            {expandedFaq === 3 && (
+              <div className="px-4 pb-4">
+                <p className="text-gray-400 text-sm">
+                  <span className="text-yellow-500 font-medium">Sponsored videos:</span> 5 $VIDEO per minute<br />
+                  <span className="text-gray-300 font-medium">Regular videos:</span> 2 $VIDEO per minute
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </div>
