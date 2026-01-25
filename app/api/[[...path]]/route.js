@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getCachedData, setCachedData } from '@/lib/redis';
-import { searchYoutubeVideos, getRandomVideosForRegion } from '@/lib/youtube';
+import { searchYoutubeVideos, getTrendingVideos, getRandomVideosForRegion, SPONSORED_VIDEO_ID } from '@/lib/youtube';
 
 // CORS headers
 const corsHeaders = {
@@ -51,22 +51,64 @@ export async function GET(request, { params }) {
       }, { headers: corsHeaders });
     }
     
-    // Get videos for feed
+    // Get videos for feed - uses YouTube Trending API with 24-hour caching
     if (path === '/videos/feed') {
       const url = new URL(request.url);
       const regionCode = url.searchParams.get('region') || 'US';
       const page = parseInt(url.searchParams.get('page') || '1');
       const limit = parseInt(url.searchParams.get('limit') || '10');
       
-      const allVideos = getRandomVideosForRegion(regionCode, 50);
+      // Cache key for trending videos - one per country, refreshes daily
+      const cacheKey = `trending:${regionCode}`;
+      const CACHE_TTL = 86400; // 24 hours in seconds
+      
+      let trendingVideos = [];
+      
+      try {
+        // Try cache first
+        const cachedData = await getCachedData(cacheKey);
+        if (cachedData) {
+          console.log(`Cache hit for trending videos: ${regionCode}`);
+          const parsed = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
+          trendingVideos = parsed.videos || [];
+        } else {
+          // Cache miss - fetch from YouTube API
+          console.log(`Cache miss for trending videos: ${regionCode}, fetching from API...`);
+          const trendingData = await getTrendingVideos(regionCode, 40);
+          trendingVideos = trendingData.videos || [];
+          
+          // Cache the results for 24 hours
+          if (trendingVideos.length > 0) {
+            await setCachedData(cacheKey, { videos: trendingVideos }, CACHE_TTL);
+            console.log(`Cached ${trendingVideos.length} trending videos for ${regionCode}`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch trending videos, using fallback:', error.message);
+        // Fallback to curated videos if API fails
+        const fallbackIds = getRandomVideosForRegion(regionCode, 40);
+        trendingVideos = fallbackIds.map(id => ({ videoId: id }));
+      }
+      
+      // Add sponsored video at the top (only on first page)
+      let allVideos = [...trendingVideos];
+      if (page === 1 && SPONSORED_VIDEO_ID) {
+        // Remove sponsored video if it exists in trending to avoid duplicates
+        allVideos = allVideos.filter(v => v.videoId !== SPONSORED_VIDEO_ID);
+        // Add sponsored video at the top with a flag
+        allVideos.unshift({ videoId: SPONSORED_VIDEO_ID, isSponsored: true });
+      }
+      
+      // Paginate
       const startIndex = (page - 1) * limit;
-      const videoIds = allVideos.slice(startIndex, startIndex + limit);
+      const paginatedVideos = allVideos.slice(startIndex, startIndex + limit);
       
       return NextResponse.json({
-        videos: videoIds.map(id => ({ videoId: id })),
+        videos: paginatedVideos,
         hasMore: startIndex + limit < allVideos.length,
         page,
-        total: allVideos.length
+        total: allVideos.length,
+        region: regionCode
       }, { headers: corsHeaders });
     }
     

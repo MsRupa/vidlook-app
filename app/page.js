@@ -179,7 +179,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
 }
 
 // Video Card Component
-function VideoCard({ videoId, onWatch, isWatching, tokensEarned }) {
+function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, title }) {
   const [watchTime, setWatchTime] = useState(0);
   const [sessionTokens, setSessionTokens] = useState(0);
   const lastRecordedMinuteRef = useRef(0);
@@ -208,13 +208,22 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned }) {
   };
 
   return (
-    <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4">
+    <Card className={`overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4 ${isSponsored ? 'ring-2 ring-yellow-500/50' : ''}`}>
+      {isSponsored && (
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center gap-1">
+          <span>⭐</span>
+          <span>SPONSORED</span>
+        </div>
+      )}
       <YouTubePlayer 
         videoId={videoId} 
         onTimeUpdate={handleTimeUpdate}
         isActive={true}
       />
       <CardContent className="p-3">
+        {title && (
+          <p className="text-white text-sm font-medium mb-2 line-clamp-2">{title}</p>
+        )}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-400 text-sm">
             <Clock className="w-4 h-4" />
@@ -234,6 +243,24 @@ function VideoCard({ videoId, onWatch, isWatching, tokensEarned }) {
 // Welcome Screen
 function WelcomeScreen({ onConnect }) {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [detectedCountry, setDetectedCountry] = useState(null);
+
+  // Pre-detect country while user is viewing the welcome screen
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const res = await fetch('https://api.country.is');
+        const data = await res.json();
+        if (data.country) {
+          setDetectedCountry(data.country);
+          console.log('Pre-detected country:', data.country);
+        }
+      } catch (e) {
+        console.log('Country pre-detection failed');
+      }
+    };
+    detectCountry();
+  }, []);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -245,7 +272,8 @@ function WelcomeScreen({ onConnect }) {
       Math.floor(Math.random() * 16).toString(16)
     ).join('');
     
-    onConnect(mockWallet);
+    // Pass pre-detected country if available
+    onConnect(mockWallet, detectedCountry);
   };
 
   return (
@@ -486,6 +514,14 @@ function HomeScreen({ user, onTokensEarned }) {
         </div>
       )}
 
+      {/* Trending Header */}
+      {searchResults.length === 0 && videos.length > 0 && (
+        <div className="px-4 py-3 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-red-500" />
+          <h2 className="text-white font-bold">Trending in {user?.country || 'your region'}</h2>
+        </div>
+      )}
+
       {/* Video Feed */}
       <div className="px-4 py-4 space-y-4">
         {isLoading && videos.length === 0 ? (
@@ -502,15 +538,20 @@ function HomeScreen({ user, onTokensEarned }) {
                 <VideoCard 
                   key={video.id.videoId}
                   videoId={video.id.videoId}
+                  title={video.snippet?.title}
                   onWatch={handleWatch}
                 />
               ))
             ) : (
-              // Feed Videos
-              displayVideos.map((video, index) => (
+              // Feed Videos (Trending + Sponsored)
+              displayVideos
+                .filter(video => video.videoId)
+                .map((video, index) => (
                 <VideoCard 
                   key={video.videoId + '-' + index}
                   videoId={video.videoId}
+                  title={video.title}
+                  isSponsored={video.isSponsored}
                   onWatch={handleWatch}
                 />
               ))
@@ -1008,17 +1049,19 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleConnect = async (walletAddress) => {
+  const handleConnect = async (walletAddress, preDetectedCountry) => {
     setIsLoading(true);
     try {
-      // Detect country
-      let country = 'US';
-      try {
-        const countryRes = await fetch('https://api.country.is');
-        const countryData = await countryRes.json();
-        country = countryData.country || 'US';
-      } catch (e) {
-        console.log('Country detection failed, using default');
+      // Use pre-detected country or detect now
+      let country = preDetectedCountry || 'US';
+      if (!preDetectedCountry) {
+        try {
+          const countryRes = await fetch('https://api.country.is');
+          const countryData = await countryRes.json();
+          country = countryData.country || 'US';
+        } catch (e) {
+          console.log('Country detection failed, using default');
+        }
       }
 
       // Connect wallet
