@@ -411,7 +411,8 @@ function HomeScreen({ user, onTokensEarned }) {
         body: JSON.stringify({
           userId: user.id,
           videoId,
-          watchedSeconds
+          watchedSeconds,
+          tokensEarned // Send the incremental tokens calculated by client
         })
       });
       const data = await res.json();

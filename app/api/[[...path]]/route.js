@@ -291,14 +291,14 @@ export async function POST(request, { params }) {
     
     // Record watch time and award tokens
     if (path === '/watch/record') {
-      const { userId, videoId, watchedSeconds } = await request.json();
+      const { userId, videoId, watchedSeconds, tokensEarned } = await request.json();
       
-      if (!userId || !videoId || watchedSeconds === undefined) {
+      if (!userId || !videoId || watchedSeconds === undefined || !tokensEarned) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders });
       }
       
-      // Calculate tokens: 2 VIDEO tokens per 60 seconds
-      const tokensEarned = Math.floor(watchedSeconds / 60) * 2;
+      // Use the tokens calculated by the client (incremental per minute)
+      // tokensEarned is already validated client-side as 2 tokens per minute
       
       if (tokensEarned > 0) {
         // Record watch history
