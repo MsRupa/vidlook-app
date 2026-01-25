@@ -42,6 +42,18 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   const containerRef = useRef(null);
   const accumulatedTimeRef = useRef(0);
   const lastTickRef = useRef(null);
+  
+  // Store callbacks in refs to avoid re-creating the player when callbacks change
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
+  
+  // Keep refs up to date
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+    onPlayRef.current = onPlay;
+    onPauseRef.current = onPause;
+  });
 
   // Load YouTube IFrame API
   useEffect(() => {
@@ -92,7 +104,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
           if (event.data === window.YT.PlayerState.PLAYING) {
             setIsPlaying(true);
             lastTickRef.current = Date.now();
-            if (onPlay) onPlay();
+            if (onPlayRef.current) onPlayRef.current();
             
             // Start tracking time
             if (intervalRef.current) clearInterval(intervalRef.current);
@@ -103,13 +115,13 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
               accumulatedTimeRef.current += delta;
               const totalTime = Math.floor(accumulatedTimeRef.current);
               setWatchTime(totalTime);
-              if (onTimeUpdate) onTimeUpdate(totalTime);
+              if (onTimeUpdateRef.current) onTimeUpdateRef.current(totalTime);
             }, 1000);
           } else if (event.data === window.YT.PlayerState.PAUSED || 
                      event.data === window.YT.PlayerState.ENDED ||
                      event.data === window.YT.PlayerState.BUFFERING) {
             setIsPlaying(false);
-            if (onPause) onPause();
+            if (onPauseRef.current) onPauseRef.current();
             
             // Stop tracking time
             if (intervalRef.current) {
@@ -130,7 +142,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
         playerRef.current = null;
       }
     };
-  }, [apiReady, videoId, onTimeUpdate, onPlay, onPause]);
+  }, [apiReady, videoId]); // Only re-create player when videoId changes, not when callbacks change
 
   // Handle visibility change - pause tracking when tab is hidden
   useEffect(() => {
@@ -391,7 +403,7 @@ function HomeScreen({ user, onTokensEarned }) {
     setSearchResults([]);
   };
 
-  const handleWatch = async (videoId, watchedSeconds, tokensEarned) => {
+  const handleWatch = useCallback(async (videoId, watchedSeconds, tokensEarned) => {
     try {
       const res = await fetch('/api/watch/record', {
         method: 'POST',
@@ -409,7 +421,7 @@ function HomeScreen({ user, onTokensEarned }) {
     } catch (error) {
       console.error('Failed to record watch:', error);
     }
-  };
+  }, [user?.id, onTokensEarned]);
 
   const displayVideos = searchResults.length > 0 ? searchResults : videos;
 
