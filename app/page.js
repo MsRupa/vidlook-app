@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { MiniKit } from '@worldcoin/minikit-js';
+import { useMiniKit } from '@/components/MiniKitProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,7 +36,8 @@ import {
   LogOut,
   HelpCircle,
   Mail,
-  Globe
+  Globe,
+  AlertTriangle
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -400,8 +403,10 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const { isInstalled, isChecking } = useMiniKit();
 
   const txt = translations[language]?.welcome || translations['en'].welcome;
+  const errorTxt = translations[language]?.error || translations['en'].error;
 
   // Pre-detect country while user is viewing the welcome screen
   useEffect(() => {
@@ -427,20 +432,135 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
   }, []);
 
   const handleConnect = async () => {
+    if (!MiniKit.isInstalled()) {
+      console.error('MiniKit is not installed');
+      return;
+    }
+
     setIsConnecting(true);
-    // Simulate wallet connection delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // Generate mock wallet address
-    const mockWallet = '0x' + Array(40).fill(0).map(() => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    
-    // Pass pre-detected country if available
-    onConnect(mockWallet, detectedCountry);
+    try {
+      // Use MiniKit wallet auth
+      const { commandPayload, finalPayload } = await MiniKit.commandsAsync.walletAuth({
+        nonce: crypto.randomUUID().replace(/-/g, ''),
+        expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
+        notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
+        statement: 'Sign in to VidLook to watch videos and earn $VIDEO tokens',
+      });
+
+      if (finalPayload.status === 'error') {
+        console.error('Wallet auth failed:', finalPayload);
+        setIsConnecting(false);
+        return;
+      }
+
+      // Get wallet address from MiniKit user
+      const walletAddress = MiniKit.user?.walletAddress;
+      const username = MiniKit.user?.username;
+      
+      if (walletAddress) {
+        // Pass to parent with username if available
+        onConnect(walletAddress, detectedCountry, username);
+      }
+    } catch (error) {
+      console.error('Wallet auth error:', error);
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const currentLang = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
+
+  // Show loading while checking MiniKit
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col items-center justify-center p-6">
+        <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+      </div>
+    );
+  }
+
+  // Show error if not inside World App
+  if (!isInstalled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full space-y-8 text-center">
+          {/* Logo */}
+          <div className="flex justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-red-500 blur-3xl opacity-30 rounded-full" />
+              <img 
+                src={LOGO_URL} 
+                alt="VidLook" 
+                className="w-24 h-24 relative z-10 drop-shadow-2xl"
+              />
+            </div>
+          </div>
+
+          {/* Error Message */}
+          <div className="space-y-4">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">
+              {errorTxt.title}
+            </h1>
+            <p className="text-gray-400">
+              {errorTxt.message}
+            </p>
+          </div>
+
+          {/* Download Link */}
+          <div className="pt-6 space-y-3">
+            <p className="text-gray-500 text-sm">{errorTxt.downloadTitle}</p>
+            <Button
+              onClick={() => window.open('https://world.org/download', '_blank')}
+              className="w-full h-12 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-xl"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              {errorTxt.downloadButton}
+            </Button>
+          </div>
+
+          {/* Language Selector */}
+          <div className="relative pt-4">
+            <button
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              className="flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-gray-800/50 hover:bg-gray-700/50 transition text-gray-300"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="text-lg">{currentLang.flag}</span>
+              <span>{currentLang.name}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showLanguageDropdown && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-xl z-50">
+                {LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      onLanguageChange(lang.code);
+                      setShowLanguageDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${
+                      language === lang.code ? 'bg-gray-700' : ''
+                    }`}
+                  >
+                    <span className="text-xl">{lang.flag}</span>
+                    <span className="text-white">{lang.name}</span>
+                    {language === lang.code && (
+                      <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex flex-col items-center justify-center p-6">
@@ -1471,7 +1591,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [language, setLanguage] = useState('en');
 
-  const handleConnect = async (walletAddress, preDetectedCountry) => {
+  const handleConnect = async (walletAddress, preDetectedCountry, username) => {
     setIsLoading(true);
     try {
       // Use pre-detected country or detect now
@@ -1486,13 +1606,13 @@ export default function App() {
         }
       }
 
-      // Connect wallet
+      // Connect wallet - use MiniKit username if available
       const res = await fetch('/api/users/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress,
-          username: `User_${walletAddress.slice(2, 8)}`,
+          username: username || `User_${walletAddress.slice(2, 8)}`,
           country
         })
       });

@@ -1,5 +1,6 @@
 import './globals.css'
 import Script from 'next/script'
+import { MiniKitProvider } from '@/components/MiniKitProvider'
 
 export const metadata = {
   title: 'VidLook - Watch YouTube & Earn WLD',
@@ -50,9 +51,11 @@ export default function RootLayout({ children }) {
         </Script>
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
-        <div className="max-w-md mx-auto min-h-screen relative">
-          {children}
-        </div>
+        <MiniKitProvider>
+          <div className="max-w-md mx-auto min-h-screen relative">
+            {children}
+          </div>
+        </MiniKitProvider>
       </body>
     </html>
   )
