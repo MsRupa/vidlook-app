@@ -56,30 +56,32 @@ const ADSTERRA_SCRIPT_SRC = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4
 const ADSTERRA_CONTAINER_ID = 'container-cae4f95eed4d1e4f9d144c0e18d8b6da';
 
 // Adsterra Native Banner Ad Component
-// Using exact Adsterra code format with their specific container ID
-function AdBanner({ className = '', id = '' }) {
+// Using EXACT Adsterra code - container ID must match exactly what their script expects
+function AdBanner({ className = '' }) {
   const containerRef = useRef(null);
   const loadedRef = useRef(false);
-  
-  // Generate unique container ID for each instance
-  const uniqueId = useRef(`${ADSTERRA_CONTAINER_ID}-${id || Math.random().toString(36).substr(2, 6)}`);
 
   useEffect(() => {
     if (loadedRef.current || !containerRef.current) return;
     if (typeof window === 'undefined') return;
     
-    // Create the container div exactly as Adsterra expects
+    // Check if container already exists (prevent duplicates)
+    if (document.getElementById(ADSTERRA_CONTAINER_ID)) {
+      console.log('Adsterra container already exists, skipping');
+      return;
+    }
+    
+    // Create the container div with EXACT ID that Adsterra expects
     const adContainer = document.createElement('div');
-    adContainer.id = uniqueId.current;
+    adContainer.id = ADSTERRA_CONTAINER_ID;
     containerRef.current.appendChild(adContainer);
     
-    // Create and load the ad script exactly as Adsterra provides
+    // Create and load the ad script EXACTLY as Adsterra provides
     const script = document.createElement('script');
     script.async = true;
     script.setAttribute('data-cfasync', 'false');
     script.src = ADSTERRA_SCRIPT_SRC;
     
-    // Add error handling to debug
     script.onerror = (e) => {
       console.error('Adsterra script failed to load:', e);
     };
@@ -87,25 +89,20 @@ function AdBanner({ className = '', id = '' }) {
       console.log('Adsterra script loaded successfully');
     };
     
+    // Append script AFTER container (as in original Adsterra code)
     containerRef.current.appendChild(script);
     loadedRef.current = true;
     
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-      loadedRef.current = false;
+      // Don't cleanup - let ad persist
     };
   }, []);
 
   return (
     <div 
       ref={containerRef} 
-      className={`w-full min-h-[50px] flex items-center justify-center bg-zinc-900/50 rounded-lg ${className}`}
-    >
-      {/* Loading placeholder */}
-      <span className="text-xs text-zinc-500">Ad</span>
-    </div>
+      className={`w-full min-h-[50px] flex items-center justify-center ${className}`}
+    />
   );
 }
 
@@ -932,7 +929,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                   );
                   // Show ONE ad after sponsored video only (for testing)
                   if (index === 0) {
-                    return [card, <AdBanner key="sponsored-ad" id="sponsored" className="my-4" />];
+                    return [card, <AdBanner key="sponsored-ad" className="my-4" />];
                   }
                   return [card];
                 })
