@@ -177,6 +177,8 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
         rel: 0,
         playsinline: 1,
         fs: 1, // Enable fullscreen button
+        origin: typeof window !== 'undefined' ? window.location.origin : '',
+        enablejsapi: 1,
       },
       events: {
         onReady: () => {
@@ -1597,8 +1599,42 @@ function BottomNav({ activeTab, onTabChange, language }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true
   const [language, setLanguage] = useState('en');
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Check for existing session on app load
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        // Check if MiniKit is installed and user is available
+        if (MiniKit.isInstalled() && MiniKit.user?.walletAddress) {
+          const walletAddress = MiniKit.user.walletAddress;
+          
+          // Try to get existing user from API
+          const res = await fetch(`/api/users/${walletAddress}`);
+          if (res.ok) {
+            const userData = await res.json();
+            if (userData && userData.id) {
+              setUser(userData);
+              // Set language based on user's country
+              const userLang = getLanguageFromCountry(userData.country);
+              if (userLang !== 'en') setLanguage(userLang);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('No existing session found');
+      } finally {
+        setIsLoading(false);
+        setIsInitialized(true);
+      }
+    };
+    
+    // Small delay to ensure MiniKit is ready
+    const timer = setTimeout(checkExistingSession, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleConnect = async (walletAddress, preDetectedCountry, username) => {
     setIsLoading(true);
@@ -1638,6 +1674,16 @@ export default function App() {
   const handleTokensUpdate = (newTotal) => {
     setUser(prev => prev ? { ...prev, totalTokens: newTotal } : null);
   };
+
+  // Show loading screen while checking for existing session
+  if (isLoading && !isInitialized) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center">
+        <img src={LOGO_URL} alt="VidLook" className="w-20 h-20 mb-4" />
+        <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+      </div>
+    );
+  }
 
   // Not connected - show welcome
   if (!user) {

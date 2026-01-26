@@ -207,8 +207,8 @@ export async function GET(request, { params }) {
       
       const allTasks = [
         { id: 'daily_login', name: 'Daily Login Bonus', reward: 50, icon: '📅', daily: true },
-        { id: 'follow_x', name: 'Follow VidLook on X', reward: 100, icon: '𝕏' },
         { id: 'post_x', name: 'Post about VidLook on X', reward: 100, icon: '𝕏' },
+        { id: 'follow_x', name: 'Follow VidLook on X', reward: 100, icon: '𝕏' },
         { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 100, icon: '⏰' }
       ];
       
