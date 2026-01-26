@@ -37,7 +37,9 @@ import {
   HelpCircle,
   Mail,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -89,6 +91,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
   const [apiReady, setApiReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const intervalRef = useRef(null);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -259,14 +262,16 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   // Handle fullscreen orientation lock for landscape mode
   useEffect(() => {
     const handleFullscreenChange = async () => {
-      const isFullscreen = !!(
+      const fullscreenEl = 
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
         document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
+        document.msFullscreenElement;
+      
+      const isFs = !!fullscreenEl;
+      setIsFullscreen(isFs);
 
-      if (isFullscreen) {
+      if (isFs) {
         // Lock to landscape when entering fullscreen
         try {
           if (screen.orientation && screen.orientation.lock) {
@@ -301,9 +306,57 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     };
   }, []);
 
+  // Custom fullscreen toggle function
+  const toggleFullscreen = async () => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    try {
+      if (!isFullscreen) {
+        // Enter fullscreen
+        if (wrapper.requestFullscreen) {
+          await wrapper.requestFullscreen();
+        } else if (wrapper.webkitRequestFullscreen) {
+          await wrapper.webkitRequestFullscreen();
+        } else if (wrapper.mozRequestFullScreen) {
+          await wrapper.mozRequestFullScreen();
+        } else if (wrapper.msRequestFullscreen) {
+          await wrapper.msRequestFullscreen();
+        }
+      } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          await document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
+      }
+    } catch (e) {
+      console.log('Fullscreen error:', e.message);
+    }
+  };
+
   return (
-    <div ref={wrapperRef} className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
+    <div ref={wrapperRef} className={`relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900 ${isFullscreen ? 'fullscreen-player' : ''}`}>
       <div ref={containerRef} className="w-full h-full" />
+      
+      {/* Custom Fullscreen Button */}
+      <button
+        onClick={toggleFullscreen}
+        className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white p-2 rounded-lg z-20 transition-colors"
+        aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+      >
+        {isFullscreen ? (
+          <Minimize2 className="w-5 h-5" />
+        ) : (
+          <Maximize2 className="w-5 h-5" />
+        )}
+      </button>
+      
       {isPlaying && (
         <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
           <div className="w-2 h-2 bg-white rounded-full" />
