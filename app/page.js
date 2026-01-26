@@ -73,35 +73,41 @@ const ADSTERRA_BANNERS = {
 };
 
 // Native Banner Ad Component (after sponsored video)
+// Uses iframe isolation for reliable reload on tab switch
 function NativeBannerAd({ className = '' }) {
-  const containerRef = useRef(null);
-  const loadedRef = useRef(false);
-
-  useEffect(() => {
-    if (loadedRef.current || !containerRef.current) return;
-    if (typeof window === 'undefined') return;
-    
-    if (document.getElementById(ADSTERRA_NATIVE.containerId)) {
-      return;
-    }
-    
-    const adContainer = document.createElement('div');
-    adContainer.id = ADSTERRA_NATIVE.containerId;
-    containerRef.current.appendChild(adContainer);
-    
-    const script = document.createElement('script');
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    script.src = ADSTERRA_NATIVE.src;
-    containerRef.current.appendChild(script);
-    loadedRef.current = true;
-  }, []);
+  const iframeHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: transparent; }
+      </style>
+    </head>
+    <body>
+      <div id="${ADSTERRA_NATIVE.containerId}"></div>
+      <script async data-cfasync="false" src="${ADSTERRA_NATIVE.src}"></script>
+    </body>
+    </html>
+  `;
 
   return (
-    <div 
-      ref={containerRef} 
-      className={`w-full min-h-[50px] flex items-center justify-center ${className}`}
-    />
+    <div className={`w-full flex items-center justify-center ${className}`}>
+      <iframe
+        srcDoc={iframeHTML}
+        style={{
+          width: '100%',
+          minHeight: 250,
+          border: 'none',
+          overflow: 'hidden',
+          background: 'transparent'
+        }}
+        scrolling="no"
+        frameBorder="0"
+        allowTransparency="true"
+        loading="eager"
+      />
+    </div>
   );
 }
 
@@ -146,6 +152,7 @@ function BannerAd({ config, className = '' }) {
         scrolling="no"
         frameBorder="0"
         allowTransparency="true"
+        loading="eager"
       />
     </div>
   );

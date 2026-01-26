@@ -35,6 +35,11 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#000000" />
         <link rel="preconnect" href="https://www.youtube.com" />
         <link rel="preconnect" href="https://www.google.com" />
+        {/* Preconnect to ad networks for faster loading */}
+        <link rel="preconnect" href="https://www.highperformanceformat.com" />
+        <link rel="preconnect" href="https://pl28574038.effectivegatecpm.com" />
+        <link rel="dns-prefetch" href="https://www.highperformanceformat.com" />
+        <link rel="dns-prefetch" href="https://pl28574038.effectivegatecpm.com" />
         
         {/* Google Analytics */}
         <Script
