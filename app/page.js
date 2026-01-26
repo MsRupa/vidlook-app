@@ -46,7 +46,7 @@ const LOGO_URL = '/logo.png';
 // SPONSORED VIDEO EARN TEXT - Change this for each sponsored video
 // Example: 'Earn 20 $VIDEO' for a 4-minute video
 // ============================================
-const SPONSORED_VIDEO_EARN_TEXT = 'Earn 5 $VIDEO per minute';
+const SPONSORED_VIDEO_EARN_TEXT = 'Earn 15 $VIDEO';
 
 // Country code to name mapping
 const COUNTRY_NAMES = {
@@ -1600,36 +1600,33 @@ export default function App() {
   const [language, setLanguage] = useState('en');
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Check for existing session on app load
+  // Check for existing session on app load - uses localStorage for persistence
   useEffect(() => {
     const checkExistingSession = async () => {
-      // Wait a bit for MiniKit to initialize
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
       try {
-        // Check if MiniKit is installed and user is available
-        if (typeof MiniKit !== 'undefined' && MiniKit.isInstalled()) {
-          const walletAddress = MiniKit.user?.walletAddress;
-          
-          if (walletAddress) {
-            // Try to get existing user from API
-            const res = await fetch(`/api/users/${walletAddress}`);
-            if (res.ok) {
-              const userData = await res.json();
-              if (userData && userData.id) {
-                setUser(userData);
-                // Set language based on user's country
-                const userLang = getLanguageFromCountry(userData.country);
-                if (userLang !== 'en') setLanguage(userLang);
-                setIsLoading(false);
-                setIsInitialized(true);
-                return;
-              }
+        // First check localStorage for saved wallet address
+        const savedWalletAddress = localStorage.getItem('vidlook_wallet_address');
+        
+        if (savedWalletAddress) {
+          // Try to get existing user from API
+          const res = await fetch(`/api/users/${savedWalletAddress}`);
+          if (res.ok) {
+            const userData = await res.json();
+            if (userData && userData.id) {
+              setUser(userData);
+              // Set language based on user's country
+              const userLang = getLanguageFromCountry(userData.country);
+              if (userLang !== 'en') setLanguage(userLang);
+              setIsLoading(false);
+              setIsInitialized(true);
+              return;
             }
           }
+          // If user not found in DB, clear the saved address
+          localStorage.removeItem('vidlook_wallet_address');
         }
       } catch (e) {
-        console.log('No existing session found:', e);
+        console.log('Session restore failed:', e);
       }
       setIsLoading(false);
       setIsInitialized(true);
@@ -1665,6 +1662,12 @@ export default function App() {
       });
 
       const userData = await res.json();
+      
+      // Save wallet address to localStorage for session persistence
+      if (userData && userData.id) {
+        localStorage.setItem('vidlook_wallet_address', walletAddress);
+      }
+      
       setUser(userData);
     } catch (error) {
       console.error('Connection failed:', error);
@@ -1720,7 +1723,10 @@ export default function App() {
         <ProfileScreen 
           user={user}
           onTokensEarned={handleTokensUpdate}
-          onLogout={() => setUser(null)}
+          onLogout={() => {
+            localStorage.removeItem('vidlook_wallet_address');
+            setUser(null);
+          }}
           language={language}
         />
       )}
