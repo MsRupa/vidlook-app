@@ -81,167 +81,262 @@ const COUNTRY_NAMES = {
   'UZ': 'Uzbekistan', 'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen', 'ZM': 'Zambia', 'ZW': 'Zimbabwe'
 };
 
-// Simple Sponsored Video Card - Uses direct iframe embed (test component)
-function SponsoredVideoCard({ videoId, onWatch, title }) {
+// Global registry to track all player instances for single-video playback
+const playerRegistry = new Map();
+
+// YouTube Player Component - Using YouTube IFrame API for accurate play/pause detection
+function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
-  const [sessionTokens, setSessionTokens] = useState(0);
+  const [apiReady, setApiReady] = useState(false);
   const intervalRef = useRef(null);
-  const lastRecordedMinuteRef = useRef(0);
-
-  // Start timer when playing
+  const playerRef = useRef(null);
+  const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const accumulatedTimeRef = useRef(0);
+  const lastTickRef = useRef(null);
+  
+  // Store callbacks in refs to avoid re-creating the player when callbacks change
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onPlayRef = useRef(onPlay);
+  const onPauseRef = useRef(onPause);
+  
+  // Keep refs up to date
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setWatchTime(prev => {
-          const newTime = prev + 1;
-          const currentMinute = Math.floor(newTime / 60);
-          
-          // Award 5 tokens per minute for sponsored videos
-          if (currentMinute > lastRecordedMinuteRef.current) {
-            const newTokens = (currentMinute - lastRecordedMinuteRef.current) * 5;
-            setSessionTokens(prev => prev + newTokens);
-            lastRecordedMinuteRef.current = currentMinute;
-            
-            if (onWatch) {
-              onWatch(videoId, newTime, newTokens);
-            }
-          }
-          return newTime;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+    onTimeUpdateRef.current = onTimeUpdate;
+    onPlayRef.current = onPlay;
+    onPauseRef.current = onPause;
+  });
+
+  // Load YouTube IFrame API
+  useEffect(() => {
+    // Check if API is already loaded
+    if (window.YT && window.YT.Player) {
+      setApiReady(true);
+      return;
     }
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+    if (!existingScript) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+
+    // Set up or chain the callback
+    const checkReady = () => {
+      if (window.YT && window.YT.Player) {
+        setApiReady(true);
       }
     };
-  }, [isPlaying, videoId, onWatch]);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+    if (window.onYouTubeIframeAPIReady) {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback();
+        checkReady();
+      };
+    } else {
+      window.onYouTubeIframeAPIReady = checkReady;
+    }
 
-  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    // Check if already ready (race condition)
+    checkReady();
+  }, []);
+
+  // Pause all other players when this one starts playing
+  const pauseOtherPlayers = useCallback(() => {
+    playerRegistry.forEach((player, id) => {
+      if (id !== videoId && player && player.pauseVideo) {
+        try {
+          player.pauseVideo();
+        } catch (e) {
+          console.warn('Failed to pause player:', id);
+        }
+      }
+    });
+  }, [videoId]);
+
+  // Initialize player when API is ready
+  useEffect(() => {
+    if (!apiReady || !containerRef.current || playerRef.current) return;
+    
+    // Don't create player if videoId is invalid
+    if (!videoId || typeof videoId !== 'string' || videoId.trim() === '') {
+      console.warn('Invalid videoId, skipping player creation');
+      return;
+    }
+
+    playerRef.current = new window.YT.Player(containerRef.current, {
+      videoId: videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        modestbranding: 1,
+        rel: 0,
+        playsinline: 1,
+        fs: 1, // Enable fullscreen button
+      },
+      events: {
+        onReady: () => {
+          // Register player in the global registry
+          playerRegistry.set(videoId, playerRef.current);
+        },
+        onStateChange: (event) => {
+          // YouTube Player States:
+          // -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+          if (event.data === window.YT.PlayerState.PLAYING) {
+            // Pause all other players before this one starts
+            pauseOtherPlayers();
+            
+            setIsPlaying(true);
+            lastTickRef.current = Date.now();
+            if (onPlayRef.current) onPlayRef.current();
+            
+            // Start tracking time
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(() => {
+              const now = Date.now();
+              const delta = (now - lastTickRef.current) / 1000;
+              lastTickRef.current = now;
+              accumulatedTimeRef.current += delta;
+              const totalTime = Math.floor(accumulatedTimeRef.current);
+              setWatchTime(totalTime);
+              if (onTimeUpdateRef.current) onTimeUpdateRef.current(totalTime);
+            }, 1000);
+          } else if (event.data === window.YT.PlayerState.PAUSED || 
+                     event.data === window.YT.PlayerState.ENDED) {
+            setIsPlaying(false);
+            if (onPauseRef.current) onPauseRef.current();
+            
+            // Stop tracking time
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+          } else if (event.data === window.YT.PlayerState.BUFFERING) {
+            // Don't count buffering time - pause the timer
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+          }
+        },
+      },
+    });
+
+    return () => {
+      // Remove from registry
+      playerRegistry.delete(videoId);
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (playerRef.current && playerRef.current.destroy) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [apiReady, videoId, pauseOtherPlayers]);
+
+  // Handle visibility change - pause tracking when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isPlaying) {
+        // Pause the video when tab is hidden
+        if (playerRef.current && playerRef.current.pauseVideo) {
+          playerRef.current.pauseVideo();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isPlaying]);
+
+  // Handle fullscreen orientation lock for landscape mode
+  useEffect(() => {
+    const handleFullscreenChange = async () => {
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+
+      if (isFullscreen) {
+        // Lock to landscape when entering fullscreen
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch (e) {
+          // Orientation lock may not be supported or allowed
+          console.log('Could not lock orientation:', e.message);
+        }
+      } else {
+        // Unlock when exiting fullscreen
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        } catch (e) {
+          console.log('Could not unlock orientation:', e.message);
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   return (
-    <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4 ring-2 ring-yellow-500/50">
-      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          <span>⭐</span>
-          <span>SPONSORED</span>
+    <div ref={wrapperRef} className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
+      <div ref={containerRef} className="w-full h-full" />
+      {isPlaying && (
+        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
+          <div className="w-2 h-2 bg-white rounded-full" />
+          Earning {isSponsored ? '5' : '2'} $VIDEO/min
         </div>
-        <span>Earn 5 $VIDEO per minute</span>
-      </div>
-      
-      <div className="relative w-full aspect-video bg-gray-900">
-        {!isPlaying ? (
-          // Thumbnail with play button
-          <div className="relative w-full h-full">
-            <img 
-              src={thumbnailUrl} 
-              alt={title || 'Sponsored Video'}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback to hqdefault if maxresdefault fails
-                e.target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-              }}
-            />
-            <button
-              onClick={() => setIsPlaying(true)}
-              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
-            >
-              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors">
-                <Play className="w-8 h-8 text-white ml-1" fill="white" />
-              </div>
-            </button>
-          </div>
-        ) : (
-          // Direct iframe embed
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
-            title={title || 'Sponsored Video'}
-            className="w-full h-full"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        )}
-        
-        {isPlaying && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
-            <div className="w-2 h-2 bg-white rounded-full" />
-            Earning $VIDEO
-          </div>
-        )}
-      </div>
-      
-      <CardContent className="p-3">
-        {title && (
-          <p className="text-white text-sm font-medium mb-2 line-clamp-2">{title}</p>
-        )}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-gray-400 text-sm">
-            <Clock className="w-4 h-4" />
-            <span>{formatTime(watchTime)}</span>
-          </div>
-          {sessionTokens > 0 && (
-            <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
-              +{sessionTokens} $VIDEO
-            </Badge>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
-// Video Card Component - Uses simple thumbnail + iframe approach
-function VideoCard({ videoId, onWatch, title }) {
-  const [isPlaying, setIsPlaying] = useState(false);
+// Unified Video Card Component - Works for both sponsored and regular videos
+function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
   const [watchTime, setWatchTime] = useState(0);
   const [sessionTokens, setSessionTokens] = useState(0);
-  const intervalRef = useRef(null);
   const lastRecordedMinuteRef = useRef(0);
 
-  // Start timer when playing
-  useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setWatchTime(prev => {
-          const newTime = prev + 1;
-          const currentMinute = Math.floor(newTime / 60);
-          
-          // Award 2 tokens per minute for regular videos
-          if (currentMinute > lastRecordedMinuteRef.current) {
-            const newTokens = (currentMinute - lastRecordedMinuteRef.current) * 2;
-            setSessionTokens(prev => prev + newTokens);
-            lastRecordedMinuteRef.current = currentMinute;
-            
-            if (onWatch) {
-              onWatch(videoId, newTime, newTokens);
-            }
-          }
-          return newTime;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+  const handleTimeUpdate = useCallback((time) => {
+    setWatchTime(time);
+    const currentMinute = Math.floor(time / 60);
+    
+    // Award tokens per minute: 5 for sponsored, 2 for regular
+    const tokensPerMinute = isSponsored ? 5 : 2;
+    if (currentMinute > lastRecordedMinuteRef.current) {
+      const newTokens = (currentMinute - lastRecordedMinuteRef.current) * tokensPerMinute;
+      setSessionTokens(prev => prev + newTokens);
+      lastRecordedMinuteRef.current = currentMinute;
+      
+      // Report to parent
+      if (onWatch) {
+        onWatch(videoId, time, newTokens);
       }
     }
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isPlaying, videoId, onWatch]);
+  }, [videoId, onWatch, isSponsored]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -249,52 +344,22 @@ function VideoCard({ videoId, onWatch, title }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-
   return (
-    <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4">
-      <div className="relative w-full aspect-video bg-gray-900">
-        {!isPlaying ? (
-          // Thumbnail with play button
-          <div className="relative w-full h-full">
-            <img 
-              src={thumbnailUrl} 
-              alt={title || 'Video'}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback to hqdefault if maxresdefault fails
-                e.target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-              }}
-            />
-            <button
-              onClick={() => setIsPlaying(true)}
-              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
-            >
-              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors">
-                <Play className="w-8 h-8 text-white ml-1" fill="white" />
-              </div>
-            </button>
+    <Card className={`overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4 ${isSponsored ? 'ring-2 ring-yellow-500/50' : ''}`}>
+      {isSponsored && (
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <span>⭐</span>
+            <span>SPONSORED</span>
           </div>
-        ) : (
-          // Direct iframe embed
-          <iframe
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
-            title={title || 'Video'}
-            className="w-full h-full"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        )}
-        
-        {isPlaying && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
-            <div className="w-2 h-2 bg-white rounded-full" />
-            Earning $VIDEO
-          </div>
-        )}
-      </div>
-      
+          <span>Earn 5 $VIDEO per minute</span>
+        </div>
+      )}
+      <YouTubePlayer 
+        videoId={videoId} 
+        onTimeUpdate={handleTimeUpdate}
+        isSponsored={isSponsored}
+      />
       <CardContent className="p-3">
         {title && (
           <p className="text-white text-sm font-medium mb-2 line-clamp-2">{title}</p>
@@ -833,22 +898,13 @@ function HomeScreen({ user, onTokensEarned, language }) {
               displayVideos
                 .filter(video => video.videoId)
                 .map((video, index) => (
-                video.isSponsored ? (
-                  <SponsoredVideoCard
-                    key={video.videoId + '-' + index}
-                    videoId={video.videoId}
-                    title={video.title}
-                    onWatch={handleWatch}
-                  />
-                ) : (
                   <VideoCard 
                     key={video.videoId + '-' + index}
                     videoId={video.videoId}
                     title={video.title}
-                    isSponsored={false}
+                    isSponsored={video.isSponsored || false}
                     onWatch={handleWatch}
                   />
-                )
               ))
             )}
 
