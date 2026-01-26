@@ -106,45 +106,48 @@ function NativeBannerAd({ className = '' }) {
 }
 
 // Banner Ad Component (for the 6 banner placements)
+// Uses iframe isolation to prevent atOptions global variable conflicts
 function BannerAd({ config, className = '' }) {
-  const containerRef = useRef(null);
-  const loadedRef = useRef(false);
-
-  useEffect(() => {
-    if (loadedRef.current || !containerRef.current) return;
-    if (typeof window === 'undefined') return;
-    
-    // Create inline script to set atOptions (as Adsterra expects)
-    const configScript = document.createElement('script');
-    configScript.type = 'text/javascript';
-    configScript.innerHTML = `
-      atOptions = {
-        'key': '${config.key}',
-        'format': 'iframe',
-        'height': ${config.height},
-        'width': ${config.width},
-        'params': {}
-      };
-    `;
-    containerRef.current.appendChild(configScript);
-    
-    // Load the invoke script
-    const invokeScript = document.createElement('script');
-    invokeScript.type = 'text/javascript';
-    invokeScript.src = `https://www.highperformanceformat.com/${config.key}/invoke.js`;
-    invokeScript.async = true;
-    invokeScript.setAttribute('data-cfasync', 'false');
-    containerRef.current.appendChild(invokeScript);
-    
-    loadedRef.current = true;
-  }, [config.key]);
+  const iframeHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: transparent; display: flex; justify-content: center; align-items: center; min-height: 100%; }
+      </style>
+    </head>
+    <body>
+      <script>
+        atOptions = {
+          'key': '${config.key}',
+          'format': 'iframe',
+          'height': ${config.height},
+          'width': ${config.width},
+          'params': {}
+        };
+      </script>
+      <script src="https://www.highperformanceformat.com/${config.key}/invoke.js"></script>
+    </body>
+    </html>
+  `;
 
   return (
-    <div 
-      ref={containerRef} 
-      className={`w-full flex items-center justify-center overflow-x-auto ${className}`}
-      style={{ minHeight: config.height + 10 }}
-    />
+    <div className={`w-full flex items-center justify-center ${className}`}>
+      <iframe
+        srcDoc={iframeHTML}
+        style={{
+          width: config.width + 20,
+          height: config.height + 20,
+          border: 'none',
+          overflow: 'hidden',
+          background: 'transparent'
+        }}
+        scrolling="no"
+        frameBorder="0"
+        allowTransparency="true"
+      />
+    </div>
   );
 }
 
