@@ -299,6 +299,127 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isActive }) {
   );
 }
 
+// Simple Sponsored Video Card - Uses direct iframe embed (test component)
+function SponsoredVideoCard({ videoId, onWatch, title }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [watchTime, setWatchTime] = useState(0);
+  const [sessionTokens, setSessionTokens] = useState(0);
+  const intervalRef = useRef(null);
+  const lastRecordedMinuteRef = useRef(0);
+
+  // Start timer when playing
+  useEffect(() => {
+    if (isPlaying) {
+      intervalRef.current = setInterval(() => {
+        setWatchTime(prev => {
+          const newTime = prev + 1;
+          const currentMinute = Math.floor(newTime / 60);
+          
+          // Award 5 tokens per minute for sponsored videos
+          if (currentMinute > lastRecordedMinuteRef.current) {
+            const newTokens = (currentMinute - lastRecordedMinuteRef.current) * 5;
+            setSessionTokens(prev => prev + newTokens);
+            lastRecordedMinuteRef.current = currentMinute;
+            
+            if (onWatch) {
+              onWatch(videoId, newTime, newTokens);
+            }
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isPlaying, videoId, onWatch]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+  return (
+    <Card className="overflow-hidden bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 mb-4 ring-2 ring-yellow-500/50">
+      <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black text-xs font-bold px-3 py-1 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <span>⭐</span>
+          <span>SPONSORED</span>
+        </div>
+        <span>Earn 5 $VIDEO per minute</span>
+      </div>
+      
+      <div className="relative w-full aspect-video bg-gray-900">
+        {!isPlaying ? (
+          // Thumbnail with play button
+          <div className="relative w-full h-full">
+            <img 
+              src={thumbnailUrl} 
+              alt={title || 'Sponsored Video'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to hqdefault if maxresdefault fails
+                e.target.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+              }}
+            />
+            <button
+              onClick={() => setIsPlaying(true)}
+              className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
+            >
+              <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors">
+                <Play className="w-8 h-8 text-white ml-1" fill="white" />
+              </div>
+            </button>
+          </div>
+        ) : (
+          // Direct iframe embed
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+            title={title || 'Sponsored Video'}
+            className="w-full h-full"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        )}
+        
+        {isPlaying && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
+            <div className="w-2 h-2 bg-white rounded-full" />
+            Earning $VIDEO
+          </div>
+        )}
+      </div>
+      
+      <CardContent className="p-3">
+        {title && (
+          <p className="text-white text-sm font-medium mb-2 line-clamp-2">{title}</p>
+        )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-gray-400 text-sm">
+            <Clock className="w-4 h-4" />
+            <span>{formatTime(watchTime)}</span>
+          </div>
+          {sessionTokens > 0 && (
+            <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
+              +{sessionTokens} $VIDEO
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // Video Card Component
 function VideoCard({ videoId, onWatch, isWatching, tokensEarned, isSponsored, title }) {
   const [watchTime, setWatchTime] = useState(0);
@@ -883,13 +1004,22 @@ function HomeScreen({ user, onTokensEarned, language }) {
               displayVideos
                 .filter(video => video.videoId)
                 .map((video, index) => (
-                <VideoCard 
-                  key={video.videoId + '-' + index}
-                  videoId={video.videoId}
-                  title={video.title}
-                  isSponsored={video.isSponsored}
-                  onWatch={handleWatch}
-                />
+                video.isSponsored ? (
+                  <SponsoredVideoCard
+                    key={video.videoId + '-' + index}
+                    videoId={video.videoId}
+                    title={video.title}
+                    onWatch={handleWatch}
+                  />
+                ) : (
+                  <VideoCard 
+                    key={video.videoId + '-' + index}
+                    videoId={video.videoId}
+                    title={video.title}
+                    isSponsored={false}
+                    onWatch={handleWatch}
+                  />
+                )
               ))
             )}
 
