@@ -30,7 +30,7 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "ALLOWALL" },
           { 
             key: "Content-Security-Policy", 
-            value: "frame-ancestors *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.effectivegatecpm.com https://*.adsterra.com https://*.highperformanceformat.com blob:; connect-src 'self' https://*.effectivegatecpm.com https://*.adsterra.com https://*.supabase.co https://*.upstash.io https://www.googleapis.com *; img-src 'self' data: https: blob:; frame-src 'self' https://*.youtube.com https://*.youtube-nocookie.com https://*.effectivegatecpm.com https://*.adsterra.com *;" 
+            value: "frame-ancestors *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.youtube.com https://www.youtube.com https://*.effectivegatecpm.com https://*.adsterra.com https://*.highperformanceformat.com blob:; connect-src 'self' https://*.youtube.com https://*.effectivegatecpm.com https://*.adsterra.com https://*.supabase.co https://*.upstash.io https://www.googleapis.com *; img-src 'self' data: https: blob:; frame-src 'self' https://*.youtube.com https://*.youtube-nocookie.com https://*.effectivegatecpm.com https://*.adsterra.com *;" 
           },
           { key: "Access-Control-Allow-Origin", value: process.env.CORS_ORIGINS || "*" },
           { key: "Access-Control-Allow-Methods", value: "GET, POST, PUT, DELETE, OPTIONS" },
