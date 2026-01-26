@@ -40,6 +40,8 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+const LOGO_URL = '/logo.png';
+
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
