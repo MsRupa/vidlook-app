@@ -206,10 +206,10 @@ export async function GET(request, { params }) {
       }
       
       const allTasks = [
-        { id: 'daily_login', name: 'Daily Login Bonus', reward: 20, icon: '📅', daily: true },
+        { id: 'daily_login', name: 'Daily Login Bonus', reward: 50, icon: '📅', daily: true },
         { id: 'follow_x', name: 'Follow VidLook on X', reward: 100, icon: '𝕏' },
-        { id: 'post_x', name: 'Post about VidLook on X', reward: 200, icon: '𝕏' },
-        { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 500, icon: '⏰' }
+        { id: 'post_x', name: 'Post about VidLook on X', reward: 100, icon: '𝕏' },
+        { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 100, icon: '⏰' }
       ];
       
       const today = new Date().toDateString();
@@ -481,12 +481,12 @@ export async function POST(request, { params }) {
       
       const taskRewards = {
         'follow_x': 100,
-        'post_x': 200,
+        'post_x': 100,
         'first_video': 50,
         'watch_10': 100,
-        'watch_60': 500,
+        'watch_60': 100,
         'first_convert': 100,
-        'daily_login': 20
+        'daily_login': 50
       };
       
       const reward = taskRewards[taskId];

@@ -1651,7 +1651,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'auto', overscrollBehavior: 'none' }}>
+    <div className="min-h-screen bg-black text-white">
       {activeTab === 'home' && (
         <HomeScreen 
           user={user} 
