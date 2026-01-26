@@ -48,6 +48,51 @@ const LOGO_URL = '/logo.png';
 // ============================================
 const SPONSORED_VIDEO_EARN_TEXT = 'Earn 15 $VIDEO';
 
+// ============================================
+// ADSTERRA ADS CONFIGURATION - Update these values to change ads
+// ============================================
+const ADSTERRA_SCRIPT_SRC = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
+const ADSTERRA_CONTAINER_ID = 'container-cae4f95eed4d1e4f9d144c0e18d8b6da';
+
+// Ad Banner Component - Adsterra Native Banner
+function AdBanner({ className = '' }) {
+  const containerRef = useRef(null);
+  const scriptLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (scriptLoadedRef.current || !containerRef.current) return;
+    
+    // Create a unique container ID to avoid conflicts
+    const uniqueId = `${ADSTERRA_CONTAINER_ID}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create the ad container div
+    const adContainer = document.createElement('div');
+    adContainer.id = uniqueId;
+    containerRef.current.appendChild(adContainer);
+    
+    // Create and load the ad script
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = ADSTERRA_SCRIPT_SRC;
+    containerRef.current.appendChild(script);
+    
+    scriptLoadedRef.current = true;
+    
+    return () => {
+      // Cleanup on unmount
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+      scriptLoadedRef.current = false;
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`w-full min-h-[100px] flex items-center justify-center ${className}`} />
+  );
+}
+
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -844,30 +889,44 @@ function HomeScreen({ user, onTokensEarned, language }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results - filter out items without valid videoId
+              // Search Results - filter out items without valid videoId, with ads after every 2 videos
               searchResults
                 .filter(video => video.id?.videoId)
-                .map((video, index) => (
-                <VideoCard 
-                  key={video.id.videoId}
-                  videoId={video.id.videoId}
-                  title={video.snippet?.title}
-                  onWatch={handleWatch}
-                />
-              ))
+                .flatMap((video, index) => {
+                  const card = (
+                    <VideoCard 
+                      key={video.id.videoId}
+                      videoId={video.id.videoId}
+                      title={video.snippet?.title}
+                      onWatch={handleWatch}
+                    />
+                  );
+                  // Show ad after every 2 videos (index 1, 3, 5, etc.)
+                  if ((index + 1) % 2 === 0) {
+                    return [card, <AdBanner key={`search-ad-${index}`} className="my-4" />];
+                  }
+                  return [card];
+                })
             ) : (
-              // Feed Videos (Trending + Sponsored)
+              // Feed Videos (Trending + Sponsored) with ads
               displayVideos
                 .filter(video => video.videoId)
-                .map((video, index) => (
-                  <VideoCard 
-                    key={video.videoId + '-' + index}
-                    videoId={video.videoId}
-                    title={video.title}
-                    isSponsored={video.isSponsored || false}
-                    onWatch={handleWatch}
-                  />
-              ))
+                .flatMap((video, index) => {
+                  const card = (
+                    <VideoCard 
+                      key={video.videoId + '-' + index}
+                      videoId={video.videoId}
+                      title={video.title}
+                      isSponsored={video.isSponsored || false}
+                      onWatch={handleWatch}
+                    />
+                  );
+                  // Show ad after sponsored video (index 0) and after every 2 videos thereafter
+                  if (index === 0 || (index > 0 && index % 2 === 0)) {
+                    return [card, <AdBanner key={`feed-ad-${index}`} className="my-4" />];
+                  }
+                  return [card];
+                })
             )}
 
             {/* Load More Trigger */}
