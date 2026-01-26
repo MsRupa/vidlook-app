@@ -52,96 +52,66 @@ const SPONSORED_VIDEO_EARN_TEXT = 'Earn 15 $VIDEO';
 // ADSTERRA ADS CONFIGURATION - Update these values to change ads
 // ============================================
 const ADSTERRA_AD_KEY = 'cae4f95eed4d1e4f9d144c0e18d8b6da';
-const ADSTERRA_SCRIPT_DOMAIN = 'pl28574038.effectivegatecpm.com';
+const ADSTERRA_SCRIPT_SRC = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
 
-// MONETAG ADS CONFIGURATION - Update these values to change ads
-// ============================================
-const MONETAG_ZONE_ID = '10522368';
-const MONETAG_SCRIPT_SRC = 'https://gizokraijaw.net/vignette.min.js';
-
-// Adsterra Ad Banner Component using iframe srcdoc for React compatibility
-// Each iframe has its own isolated window object, preventing global variable conflicts
-function AdsterraAdBanner({ className = '' }) {
-  const adHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { margin: 0; padding: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: transparent; }
-      </style>
-    </head>
-    <body>
-      <script type="text/javascript">
-        atOptions = {
-          'key': '${ADSTERRA_AD_KEY}',
-          'format': 'iframe',
-          'height': 100,
-          'width': 320,
-          'params': {}
-        };
-      </script>
-      <script type="text/javascript" src="//${ADSTERRA_SCRIPT_DOMAIN}/${ADSTERRA_AD_KEY}/invoke.js"></script>
-    </body>
-    </html>
-  `;
-
-  return (
-    <div className={`w-full flex items-center justify-center ${className}`}>
-      <iframe
-        srcDoc={adHTML}
-        style={{
-          width: '320px',
-          height: '100px',
-          border: 'none',
-          overflow: 'hidden',
-          background: 'transparent'
-        }}
-        scrolling="no"
-        frameBorder="0"
-        title="Ad"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      />
-    </div>
-  );
-}
-
-// Monetag Vignette Banner Component - Testing in World App environment
-function MonetagAdBanner({ className = '' }) {
+// Adsterra Native Banner Ad Component
+// Uses atAsyncOptions array approach for multiple ads + data-cfasync for Cloudflare
+function AdBanner({ className = '' }) {
   const containerRef = useRef(null);
-  const scriptLoadedRef = useRef(false);
+  const adIdRef = useRef(`adsterra-${Math.random().toString(36).substr(2, 9)}`);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (scriptLoadedRef.current || !containerRef.current) return;
+    if (loadedRef.current || !containerRef.current) return;
     
-    // Create and load the Monetag vignette script
-    const script = document.createElement('script');
-    script.dataset.zone = MONETAG_ZONE_ID;
-    script.src = MONETAG_SCRIPT_SRC;
-    script.async = true;
-    containerRef.current.appendChild(script);
+    const containerId = adIdRef.current;
     
-    scriptLoadedRef.current = true;
+    // Create the container div with unique ID
+    const adContainer = document.createElement('div');
+    adContainer.id = containerId;
+    containerRef.current.appendChild(adContainer);
+    
+    // Create atAsyncOptions config script
+    const configScript = document.createElement('script');
+    configScript.type = 'text/javascript';
+    configScript.setAttribute('data-cfasync', 'false');
+    configScript.innerHTML = `
+      if (typeof atAsyncOptions !== 'object') var atAsyncOptions = [];
+      atAsyncOptions.push({
+        key: '${ADSTERRA_AD_KEY}',
+        format: 'js',
+        async: true,
+        container: '${containerId}',
+        params: {}
+      });
+    `;
+    containerRef.current.appendChild(configScript);
+    
+    // Create and load the invoke script
+    const invokeScript = document.createElement('script');
+    invokeScript.type = 'text/javascript';
+    invokeScript.src = ADSTERRA_SCRIPT_SRC;
+    invokeScript.async = true;
+    invokeScript.setAttribute('data-cfasync', 'false');
+    containerRef.current.appendChild(invokeScript);
+    
+    loadedRef.current = true;
     
     return () => {
+      // Cleanup on unmount
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
-      scriptLoadedRef.current = false;
+      loadedRef.current = false;
     };
   }, []);
 
   return (
-    <div ref={containerRef} className={`w-full min-h-[50px] flex items-center justify-center ${className}`} />
+    <div 
+      ref={containerRef} 
+      className={`w-full min-h-[100px] flex items-center justify-center ${className}`} 
+    />
   );
-}
-
-// Combined Ad Banner - Use variant prop to choose ad network
-// variant: 'adsterra' (default) | 'monetag'
-function AdBanner({ className = '', variant = 'adsterra' }) {
-  if (variant === 'monetag') {
-    return <MonetagAdBanner className={className} />;
-  }
-  return <AdsterraAdBanner className={className} />;
 }
 
 // Country code to name mapping
@@ -972,12 +942,9 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       onWatch={handleWatch}
                     />
                   );
-                  // Show Monetag ad after sponsored video (index 0), Adsterra after every 2 videos thereafter
-                  if (index === 0) {
-                    return [card, <AdBanner key={`feed-ad-${index}`} className="my-4" variant="monetag" />];
-                  }
-                  if (index > 0 && index % 2 === 0) {
-                    return [card, <AdBanner key={`feed-ad-${index}`} className="my-4" variant="adsterra" />];
+                  // Show ad after sponsored video (index 0) and after every 2 videos thereafter
+                  if (index === 0 || (index > 0 && index % 2 === 0)) {
+                    return [card, <AdBanner key={`feed-ad-${index}`} className="my-4" />];
                   }
                   return [card];
                 })
