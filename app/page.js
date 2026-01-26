@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { useMiniKit } from '@/components/MiniKitProvider';
 import { Button } from '@/components/ui/button';
