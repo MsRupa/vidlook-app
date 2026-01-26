@@ -53,52 +53,44 @@ const SPONSORED_VIDEO_EARN_TEXT = 'Earn 15 $VIDEO';
 // ============================================
 const ADSTERRA_AD_KEY = 'cae4f95eed4d1e4f9d144c0e18d8b6da';
 const ADSTERRA_SCRIPT_SRC = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
+const ADSTERRA_CONTAINER_ID = 'container-cae4f95eed4d1e4f9d144c0e18d8b6da';
 
 // Adsterra Native Banner Ad Component
-// Uses atAsyncOptions array approach for multiple ads + data-cfasync for Cloudflare
-function AdBanner({ className = '' }) {
+// Using exact Adsterra code format with their specific container ID
+function AdBanner({ className = '', id = '' }) {
   const containerRef = useRef(null);
-  const adIdRef = useRef(`adsterra-${Math.random().toString(36).substr(2, 9)}`);
   const loadedRef = useRef(false);
+  
+  // Generate unique container ID for each instance
+  const uniqueId = useRef(`${ADSTERRA_CONTAINER_ID}-${id || Math.random().toString(36).substr(2, 6)}`);
 
   useEffect(() => {
     if (loadedRef.current || !containerRef.current) return;
+    if (typeof window === 'undefined') return;
     
-    const containerId = adIdRef.current;
-    
-    // Create the container div with unique ID
+    // Create the container div exactly as Adsterra expects
     const adContainer = document.createElement('div');
-    adContainer.id = containerId;
+    adContainer.id = uniqueId.current;
     containerRef.current.appendChild(adContainer);
     
-    // Create atAsyncOptions config script
-    const configScript = document.createElement('script');
-    configScript.type = 'text/javascript';
-    configScript.setAttribute('data-cfasync', 'false');
-    configScript.innerHTML = `
-      if (typeof atAsyncOptions !== 'object') var atAsyncOptions = [];
-      atAsyncOptions.push({
-        key: '${ADSTERRA_AD_KEY}',
-        format: 'js',
-        async: true,
-        container: '${containerId}',
-        params: {}
-      });
-    `;
-    containerRef.current.appendChild(configScript);
+    // Create and load the ad script exactly as Adsterra provides
+    const script = document.createElement('script');
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.src = ADSTERRA_SCRIPT_SRC;
     
-    // Create and load the invoke script
-    const invokeScript = document.createElement('script');
-    invokeScript.type = 'text/javascript';
-    invokeScript.src = ADSTERRA_SCRIPT_SRC;
-    invokeScript.async = true;
-    invokeScript.setAttribute('data-cfasync', 'false');
-    containerRef.current.appendChild(invokeScript);
+    // Add error handling to debug
+    script.onerror = (e) => {
+      console.error('Adsterra script failed to load:', e);
+    };
+    script.onload = () => {
+      console.log('Adsterra script loaded successfully');
+    };
     
+    containerRef.current.appendChild(script);
     loadedRef.current = true;
     
     return () => {
-      // Cleanup on unmount
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
@@ -109,8 +101,11 @@ function AdBanner({ className = '' }) {
   return (
     <div 
       ref={containerRef} 
-      className={`w-full min-h-[100px] flex items-center justify-center ${className}`} 
-    />
+      className={`w-full min-h-[50px] flex items-center justify-center bg-zinc-900/50 rounded-lg ${className}`}
+    >
+      {/* Loading placeholder */}
+      <span className="text-xs text-zinc-500">Ad</span>
+    </div>
   );
 }
 
@@ -910,26 +905,19 @@ function HomeScreen({ user, onTokensEarned, language }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results - filter out items without valid videoId, with ads after every 2 videos
+              // Search Results - no ads for now during testing
               searchResults
                 .filter(video => video.id?.videoId)
-                .flatMap((video, index) => {
-                  const card = (
-                    <VideoCard 
-                      key={video.id.videoId}
-                      videoId={video.id.videoId}
-                      title={video.snippet?.title}
-                      onWatch={handleWatch}
-                    />
-                  );
-                  // Show ad after every 2 videos (index 1, 3, 5, etc.)
-                  if ((index + 1) % 2 === 0) {
-                    return [card, <AdBanner key={`search-ad-${index}`} className="my-4" />];
-                  }
-                  return [card];
-                })
+                .map((video, index) => (
+                  <VideoCard 
+                    key={video.id.videoId}
+                    videoId={video.id.videoId}
+                    title={video.snippet?.title}
+                    onWatch={handleWatch}
+                  />
+                ))
             ) : (
-              // Feed Videos (Trending + Sponsored) with ads
+              // Feed Videos (Trending + Sponsored) - ONE ad after sponsored video for testing
               displayVideos
                 .filter(video => video.videoId)
                 .flatMap((video, index) => {
@@ -942,9 +930,9 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       onWatch={handleWatch}
                     />
                   );
-                  // Show ad after sponsored video (index 0) and after every 2 videos thereafter
-                  if (index === 0 || (index > 0 && index % 2 === 0)) {
-                    return [card, <AdBanner key={`feed-ad-${index}`} className="my-4" />];
+                  // Show ONE ad after sponsored video only (for testing)
+                  if (index === 0) {
+                    return [card, <AdBanner key="sponsored-ad" id="sponsored" className="my-4" />];
                   }
                   return [card];
                 })
