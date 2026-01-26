@@ -124,28 +124,6 @@ body {
   border: 0;
 }
 
-/* Fullscreen player container styles */
-.fullscreen-player {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 9999 !important;
-  border-radius: 0 !important;
-  aspect-ratio: unset !important;
-}
-
-.fullscreen-player > div {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.fullscreen-player iframe {
-  width: 100% !important;
-  height: 100% !important;
-}
-
 /* YouTube iframe fullscreen styles - ensure landscape orientation */
 iframe:fullscreen {
   width: 100vw !important;
