@@ -42,6 +42,12 @@ import {
 
 const LOGO_URL = '/logo.png';
 
+// ============================================
+// SPONSORED VIDEO EARN TEXT - Change this for each sponsored video
+// Example: 'Earn 20 $VIDEO' for a 4-minute video
+// ============================================
+const SPONSORED_VIDEO_EARN_TEXT = 'Earn 5 $VIDEO per minute';
+
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -261,7 +267,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
       <div ref={containerRef} className="w-full h-full" />
       {isPlaying && (
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
+        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
           <div className="w-2 h-2 bg-white rounded-full" />
           Earning {isSponsored ? '5' : '2'} $VIDEO/min
         </div>
@@ -308,7 +314,7 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
             <span>⭐</span>
             <span>SPONSORED</span>
           </div>
-          <span>Earn 5 $VIDEO per minute</span>
+          <span>{SPONSORED_VIDEO_EARN_TEXT}</span>
         </div>
       )}
       <YouTubePlayer 
@@ -1408,18 +1414,6 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
         </div>
       </div>
 
-      {/* Confirmation Message */}
-      {confirmationWld && (
-        <Card className="bg-green-500/10 border-green-500/30 mb-6">
-          <CardContent className="p-4 text-center">
-            <CheckCircle2 className="w-8 h-8 text-green-500 mx-auto mb-2" />
-            <p className="text-green-500 font-medium">
-              {txt.confirmationMsg.replace('{amount}', confirmationWld)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Balance Card */}
       <Card className="bg-gradient-to-br from-red-500/20 to-orange-500/20 border-red-500/30 mb-6">
         <CardContent className="p-6 text-center">
@@ -1482,8 +1476,11 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
           )}
 
           {success && (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-500 text-sm">
-              {success}
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-500 text-sm text-center">
+              <p className="font-medium">{success}</p>
+              {confirmationWld && (
+                <p className="mt-1 text-xs">{txt.confirmationMsg.replace('{amount}', confirmationWld)}</p>
+              )}
             </div>
           )}
 
@@ -1606,34 +1603,39 @@ export default function App() {
   // Check for existing session on app load
   useEffect(() => {
     const checkExistingSession = async () => {
+      // Wait a bit for MiniKit to initialize
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       try {
         // Check if MiniKit is installed and user is available
-        if (MiniKit.isInstalled() && MiniKit.user?.walletAddress) {
-          const walletAddress = MiniKit.user.walletAddress;
+        if (typeof MiniKit !== 'undefined' && MiniKit.isInstalled()) {
+          const walletAddress = MiniKit.user?.walletAddress;
           
-          // Try to get existing user from API
-          const res = await fetch(`/api/users/${walletAddress}`);
-          if (res.ok) {
-            const userData = await res.json();
-            if (userData && userData.id) {
-              setUser(userData);
-              // Set language based on user's country
-              const userLang = getLanguageFromCountry(userData.country);
-              if (userLang !== 'en') setLanguage(userLang);
+          if (walletAddress) {
+            // Try to get existing user from API
+            const res = await fetch(`/api/users/${walletAddress}`);
+            if (res.ok) {
+              const userData = await res.json();
+              if (userData && userData.id) {
+                setUser(userData);
+                // Set language based on user's country
+                const userLang = getLanguageFromCountry(userData.country);
+                if (userLang !== 'en') setLanguage(userLang);
+                setIsLoading(false);
+                setIsInitialized(true);
+                return;
+              }
             }
           }
         }
       } catch (e) {
-        console.log('No existing session found');
-      } finally {
-        setIsLoading(false);
-        setIsInitialized(true);
+        console.log('No existing session found:', e);
       }
+      setIsLoading(false);
+      setIsInitialized(true);
     };
     
-    // Small delay to ensure MiniKit is ready
-    const timer = setTimeout(checkExistingSession, 100);
-    return () => clearTimeout(timer);
+    checkExistingSession();
   }, []);
 
   const handleConnect = async (walletAddress, preDetectedCountry, username) => {
