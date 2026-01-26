@@ -541,7 +541,7 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
             <img 
               src={LOGO_URL} 
               alt="VidLook" 
-              className="w-32 h-32 relative z-10 drop-shadow-2xl"
+              className="w-24 h-24 relative z-10 drop-shadow-2xl"
             />
           </div>
         </div>
@@ -557,7 +557,7 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
         </div>
 
         {/* Features */}
-        <div className="space-y-4 py-6">
+        <div className="space-y-4 py-3">
           <div className="flex items-center gap-3 bg-gray-800/50 rounded-xl p-4 backdrop-blur">
             <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
               <Play className="w-5 h-5 text-red-500" />
@@ -932,12 +932,29 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   const completeTask = async (taskId) => {
     setCompletingTask(taskId);
     try {
+      // For follow_x task: open Twitter profile first, then complete
+      if (taskId === 'follow_x') {
+        window.open('https://x.com/vidlookapp', '_blank');
+      }
+      
+      // For post_x task: open Twitter with pre-filled tweet
+      if (taskId === 'post_x') {
+        const tweetText = encodeURIComponent('I\'m earning $VIDEO tokens by watching YouTube videos on @vidlookapp! 🎬💰\n\nWatch & Earn in the World App! 🌍\n\n#VidLook #WorldApp #Web3 #Crypto');
+        window.open(`https://x.com/intent/tweet?text=${tweetText}`, '_blank');
+      }
+      
       const res = await fetch('/api/tasks/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, taskId })
       });
       const data = await res.json();
+      
+      if (data.error) {
+        // Show error message for specific cases
+        console.log('Task error:', data.error);
+        return;
+      }
       
       if (data.success) {
         // Update tasks
@@ -1227,6 +1244,24 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm whitespace-pre-line">
                   {txt.faq3Answer}
+                </p>
+              </div>
+            )}
+          </Card>
+
+          {/* FAQ 4 - Transparency */}
+          <Card className="bg-gray-900 border-gray-800 overflow-hidden">
+            <button 
+              onClick={() => setExpandedFaq(expandedFaq === 4 ? null : 4)}
+              className="w-full p-4 flex items-center justify-between text-left"
+            >
+              <p className="text-white font-medium">{txt.faq4Question}</p>
+              <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expandedFaq === 4 ? 'rotate-180' : ''}`} />
+            </button>
+            {expandedFaq === 4 && (
+              <div className="px-4 pb-4">
+                <p className="text-gray-400 text-sm whitespace-pre-line">
+                  {txt.faq4Answer}
                 </p>
               </div>
             )}
@@ -1526,6 +1561,11 @@ function BottomNav({ activeTab, onTabChange, language }) {
     { id: 'profile', icon: User, label: txt.profile }
   ];
 
+  const handleTabChange = (tabId) => {
+    window.scrollTo(0, 0);
+    onTabChange(tabId);
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-gray-800 px-6 py-2 z-50">
       <div className="flex items-center justify-around max-w-md mx-auto">
@@ -1536,7 +1576,7 @@ function BottomNav({ activeTab, onTabChange, language }) {
           return (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all ${
                 isActive 
                   ? 'bg-red-500/20 text-red-500' 
@@ -1611,7 +1651,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'auto', overscrollBehavior: 'none' }}>
       {activeTab === 'home' && (
         <HomeScreen 
           user={user} 

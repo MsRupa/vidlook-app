@@ -206,19 +206,34 @@ export async function GET(request, { params }) {
       }
       
       const allTasks = [
-        { id: 'daily_login', name: 'Daily Login Bonus', reward: 50, icon: '📅', daily: true },
+        { id: 'daily_login', name: 'Daily Login Bonus', reward: 20, icon: '📅', daily: true },
         { id: 'follow_x', name: 'Follow VidLook on X', reward: 100, icon: '𝕏' },
-        { id: 'post_x', name: 'Post about VidLook on X', reward: 100, icon: '𝕏' },
-        { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 100, icon: '⏰' }
+        { id: 'post_x', name: 'Post about VidLook on X', reward: 200, icon: '𝕏' },
+        { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 500, icon: '⏰' }
       ];
       
-      const completedTaskIds = completedTasks.map(t => t.task_id);
+      const today = new Date().toDateString();
       
-      return NextResponse.json(allTasks.map(task => ({
-        ...task,
-        completed: completedTaskIds.includes(task.id),
-        completedAt: completedTasks.find(t => t.task_id === task.id)?.completed_at
-      })), { headers: corsHeaders });
+      return NextResponse.json(allTasks.map(task => {
+        const completedTask = completedTasks.find(t => t.task_id === task.id);
+        
+        // For daily_login: only show as completed if claimed today
+        if (task.id === 'daily_login' && completedTask) {
+          const lastClaim = new Date(completedTask.completed_at).toDateString();
+          return {
+            ...task,
+            completed: lastClaim === today,
+            completedAt: completedTask.completed_at
+          };
+        }
+        
+        // For other tasks: show as completed if ever completed
+        return {
+          ...task,
+          completed: !!completedTask,
+          completedAt: completedTask?.completed_at
+        };
+      }), { headers: corsHeaders });
     }
     
     // Get user stats
@@ -479,6 +494,23 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'Invalid task' }, { status: 400, headers: corsHeaders });
       }
       
+      // For watch_60 task: verify user has watched at least 60 minutes (3600 seconds)
+      if (taskId === 'watch_60') {
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('total_watched_seconds')
+          .eq('id', userId)
+          .single();
+        
+        if (userError) {
+          return NextResponse.json({ error: userError.message }, { status: 500, headers: corsHeaders });
+        }
+        
+        if ((user?.total_watched_seconds || 0) < 3600) {
+          return NextResponse.json({ error: 'Watch at least 1 hour of videos first' }, { status: 400, headers: corsHeaders });
+        }
+      }
+      
       // Check if already completed
       const { data: existingTask, error: fetchError } = await supabase
         .from('tasks')
@@ -487,8 +519,8 @@ export async function POST(request, { params }) {
         .eq('task_id', taskId)
         .single();
       
-      // Check if already completed (except daily tasks)
-      if (existingTask && taskId !== 'daily_login') {
+      // For lifetime tasks (follow_x, post_x, watch_60): check if already completed ever
+      if (existingTask && (taskId === 'follow_x' || taskId === 'post_x' || taskId === 'watch_60')) {
         return NextResponse.json({ error: 'Task already completed' }, { status: 400, headers: corsHeaders });
       }
       
