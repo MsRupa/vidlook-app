@@ -37,7 +37,8 @@ import {
   HelpCircle,
   Mail,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  Maximize2
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -296,6 +297,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
         origin: typeof window !== 'undefined' ? window.location.origin : '',
         enablejsapi: 1,
       },
+      host: 'https://www.youtube-nocookie.com', // Use privacy-enhanced mode for better WebView compatibility
       events: {
         onReady: () => {
           // Register player in the global registry
@@ -373,8 +375,42 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying]);
 
+  // Custom fullscreen handler for iOS WebView compatibility
+  const handleFullscreen = useCallback(() => {
+    const container = containerRef.current?.parentElement;
+    if (!container) return;
+
+    // Check if we're already in fullscreen
+    const isFullscreen = document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement;
+
+    if (isFullscreen) {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+      }
+    } else {
+      // Enter fullscreen
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      } else if (container.webkitRequestFullscreen) {
+        container.webkitRequestFullscreen();
+      } else if (container.mozRequestFullScreen) {
+        container.mozRequestFullScreen();
+      } else if (container.webkitEnterFullscreen) {
+        // iOS-specific for video elements
+        container.webkitEnterFullscreen();
+      }
+    }
+  }, []);
+
   return (
-    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900 fullscreen-container">
       <div ref={containerRef} className="w-full h-full" />
       {isPlaying && (
         <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
@@ -382,6 +418,14 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
           Earning {isSponsored ? '5' : '2'} $VIDEO/min
         </div>
       )}
+      {/* Custom fullscreen button for better iOS WebView support */}
+      <button 
+        onClick={handleFullscreen}
+        className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white p-2 rounded-lg z-20 transition-colors"
+        aria-label="Toggle fullscreen"
+      >
+        <Maximize2 className="w-5 h-5" />
+      </button>
     </div>
   );
 }
