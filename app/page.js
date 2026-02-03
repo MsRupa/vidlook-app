@@ -1037,6 +1037,12 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   const [tasks, setTasks] = useState([]);
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure component is mounted before rendering (fixes iOS loading issue)
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [completingTask, setCompletingTask] = useState(null);
   const [expandedFaq, setExpandedFaq] = useState(null);
 
@@ -1139,9 +1145,9 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
     return `${mins}m`;
   };
 
-  if (isLoading) {
+  if (!isMounted || isLoading) {
     return (
-      <div className="pb-24">
+      <div className="pb-24" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Profile Header Skeleton */}
         <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 p-6">
           <div className="flex items-center gap-4">
@@ -1233,7 +1239,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   }
 
   return (
-    <div className="pb-24">
+    <div className="pb-24" style={{ paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}>
       {/* Profile Header */}
       <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 p-6">
         <div className="flex items-center gap-3">
@@ -1714,8 +1720,8 @@ function BottomNav({ activeTab, onTabChange, language }) {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-gray-800 px-6 py-2 z-50">
-      <div className="flex items-center justify-around max-w-md mx-auto">
+    <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-gray-800 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="flex items-center justify-around max-w-md mx-auto px-6 py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
