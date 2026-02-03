@@ -61,6 +61,16 @@ export default function RootLayout({ children }) {
             {children}
           </div>
         </MiniKitProvider>
+        
+        {/* Oculus Analytics for World Mini Apps - must be at end of body */}
+        <Script src="https://oculus-sdk.humanlabs.world" strategy="afterInteractive" />
+        <Script id="oculus-init" strategy="afterInteractive">
+          {`
+            window.oculusLayer = window.oculusLayer || [];
+            function oculus() { oculusLayer.push(arguments); }
+            oculus("app_id", "${process.env.NEXT_PUBLIC_APP_ID}");
+          `}
+        </Script>
       </body>
     </html>
   )
