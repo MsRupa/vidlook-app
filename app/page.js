@@ -46,7 +46,7 @@ const LOGO_URL = '/logo.png';
 // SPONSORED VIDEO EARN TEXT - Change this for each sponsored video
 // Example: 'Earn 20 $VIDEO' for a 4-minute video
 // ============================================
-const SPONSORED_VIDEO_EARN_TEXT = 'Earn 15 $VIDEO';
+const SPONSORED_VIDEO_EARN_TEXT = 'Earn 115 $VIDEO';
 
 // ============================================
 // ADSTERRA ADS CONFIGURATION - Update these values to change ads
