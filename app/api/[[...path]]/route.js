@@ -298,14 +298,17 @@ export async function POST(request, { params }) {
         .single();
       
       if (existingUser) {
-        // Update country if changed
+        // Always update updated_at on login, and country if changed
+        const updateData = { updated_at: new Date().toISOString() };
         if (country && country !== existingUser.country) {
-          await supabase
-            .from('users')
-            .update({ country, updated_at: new Date().toISOString() })
-            .eq('id', existingUser.id);
+          updateData.country = country;
           existingUser.country = country;
         }
+        
+        await supabase
+          .from('users')
+          .update(updateData)
+          .eq('id', existingUser.id);
         
         return NextResponse.json({
           id: existingUser.id,
