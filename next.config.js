@@ -30,7 +30,7 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "ALLOWALL" },
           { 
             key: "Content-Security-Policy", 
-            value: "frame-ancestors *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.youtube.com https://www.youtube.com https://*.effectivegatecpm.com https://*.adsterra.com https://*.highperformanceformat.com https://www.googletagmanager.com https://www.google-analytics.com https://oculus-sdk.humanlabs.world blob:; connect-src 'self' https://*.youtube.com https://*.effectivegatecpm.com https://*.adsterra.com https://*.supabase.co https://*.upstash.io https://www.googleapis.com https://www.google-analytics.com https://analytics.google.com https://*.humanlabs.world *; img-src 'self' data: https: blob:; frame-src 'self' https://*.youtube.com https://*.youtube-nocookie.com https://*.effectivegatecpm.com https://*.adsterra.com *;" 
+            value: "frame-ancestors *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.youtube.com https://www.youtube.com https://www.googletagmanager.com https://www.google-analytics.com https://oculus-sdk.humanlabs.world blob:; connect-src 'self' https://*.youtube.com https://*.supabase.co https://*.upstash.io https://www.googleapis.com https://www.google-analytics.com https://analytics.google.com https://*.humanlabs.world *; img-src 'self' data: https: blob:; frame-src 'self' https://*.youtube.com https://*.youtube-nocookie.com *;" 
           },
           { 
             key: "Permissions-Policy", 

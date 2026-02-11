@@ -49,10 +49,13 @@ const LOGO_URL = '/logo.png';
 const SPONSORED_VIDEO_EARN_TEXT = 'Earn 115 $VIDEO';
 
 // ============================================
-// ADSTERRA ADS CONFIGURATION - Update these values to change ads
+// ADSTERRA ADS CONFIGURATION - DISABLED FOR APP STORE APPROVAL
 // ============================================
+// Ads temporarily disabled. Keep config for future use when approved with safer ad network.
+// TODO: Replace with Google AdSense or Media.net after getting traffic
 
-// Native Banner (after sponsored video) - already working
+/*
+// Native Banner (after sponsored video)
 const ADSTERRA_NATIVE = {
   key: 'cae4f95eed4d1e4f9d144c0e18d8b6da',
   src: 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js',
@@ -61,102 +64,14 @@ const ADSTERRA_NATIVE = {
 
 // 6 Banner Ads for Search and Feed sections
 const ADSTERRA_BANNERS = {
-  // SEARCH SECTION ADS (3 ads)
-  searchHeader: { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },   // Above search results
-  searchAd1: { key: 'd0b3a57d787c66a60c224207d0cb7bf5', width: 300, height: 250 },     // After 2 search results
-  searchAd2: { key: 'eb078d99fd9e73467084b64849ed2c56', width: 468, height: 60 },      // After 4 search results
-  
-  // FEED SECTION ADS (3 ads - after native banner)
-  feedAd1: { key: '4b93b1a293b06b300ae9666221ef96db', width: 728, height: 90 },        // After 2 trending videos
-  feedAd2: { key: 'c69d985ff1c9f30a2fffc0949cb3448a', width: 160, height: 300 },       // After 4 trending videos
-  feedAd3: { key: '1978fdba198639aeec7244e408dbd4a8', width: 160, height: 600 },       // After 6 trending videos
+  searchHeader: { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },
+  searchAd1: { key: 'd0b3a57d787c66a60c224207d0cb7bf5', width: 300, height: 250 },
+  searchAd2: { key: 'eb078d99fd9e73467084b64849ed2c56', width: 468, height: 60 },
+  feedAd1: { key: '4b93b1a293b06b300ae9666221ef96db', width: 728, height: 90 },
+  feedAd2: { key: 'c69d985ff1c9f30a2fffc0949cb3448a', width: 160, height: 300 },
+  feedAd3: { key: '1978fdba198639aeec7244e408dbd4a8', width: 160, height: 600 },
 };
-
-// Native Banner Ad Component (after sponsored video)
-// Uses iframe isolation for reliable reload on tab switch
-function NativeBannerAd({ className = '' }) {
-  const iframeHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: transparent; }
-      </style>
-    </head>
-    <body>
-      <div id="${ADSTERRA_NATIVE.containerId}"></div>
-      <script async data-cfasync="false" src="${ADSTERRA_NATIVE.src}"></script>
-    </body>
-    </html>
-  `;
-
-  return (
-    <div className={`w-full flex items-center justify-center ${className}`}>
-      <iframe
-        srcDoc={iframeHTML}
-        style={{
-          width: '100%',
-          minHeight: 250,
-          border: 'none',
-          overflow: 'hidden',
-          background: 'transparent'
-        }}
-        scrolling="no"
-        frameBorder="0"
-        allowTransparency="true"
-        loading="eager"
-      />
-    </div>
-  );
-}
-
-// Banner Ad Component (for the 6 banner placements)
-// Uses iframe isolation to prevent atOptions global variable conflicts
-function BannerAd({ config, className = '' }) {
-  const iframeHTML = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: transparent; display: flex; justify-content: center; align-items: center; min-height: 100%; }
-      </style>
-    </head>
-    <body>
-      <script>
-        atOptions = {
-          'key': '${config.key}',
-          'format': 'iframe',
-          'height': ${config.height},
-          'width': ${config.width},
-          'params': {}
-        };
-      </script>
-      <script src="https://www.highperformanceformat.com/${config.key}/invoke.js"></script>
-    </body>
-    </html>
-  `;
-
-  return (
-    <div className={`w-full flex items-center justify-center ${className}`}>
-      <iframe
-        srcDoc={iframeHTML}
-        style={{
-          width: config.width + 20,
-          height: config.height + 20,
-          border: 'none',
-          overflow: 'hidden',
-          background: 'transparent'
-        }}
-        scrolling="no"
-        frameBorder="0"
-        allowTransparency="true"
-        loading="eager"
-      />
-    </div>
-  );
-}
+*/
 
 // Country code to name mapping
 const COUNTRY_NAMES = {
@@ -921,13 +836,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
         </div>
       )}
 
-      {/* Banner Ad Above Search Results */}
-      {searchResults.length > 0 && (
-        <div className="px-4 py-2">
-          <BannerAd config={ADSTERRA_BANNERS.searchHeader} className="my-2" />
-        </div>
-      )}
-
       {/* Trending Header */}
       {searchResults.length === 0 && !isSearching && (
         <div className="px-4 py-3 flex items-center gap-2">
@@ -961,61 +869,30 @@ function HomeScreen({ user, onTokensEarned, language }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results with ads after every 2 videos (2 times)
+              // Search Results (ads disabled for app store approval)
               searchResults
                 .filter(video => video.id?.videoId)
-                .flatMap((video, index) => {
-                  const card = (
-                    <VideoCard 
-                      key={video.id.videoId}
-                      videoId={video.id.videoId}
-                      title={video.snippet?.title}
-                      onWatch={handleWatch}
-                    />
-                  );
-                  // Ad after 2nd video (index 1)
-                  if (index === 1) {
-                    return [card, <BannerAd key="search-ad-1" config={ADSTERRA_BANNERS.searchAd1} className="my-4" />];
-                  }
-                  // Ad after 4th video (index 3)
-                  if (index === 3) {
-                    return [card, <BannerAd key="search-ad-2" config={ADSTERRA_BANNERS.searchAd2} className="my-4" />];
-                  }
-                  return [card];
-                })
+                .map((video) => (
+                  <VideoCard 
+                    key={video.id.videoId}
+                    videoId={video.id.videoId}
+                    title={video.snippet?.title}
+                    onWatch={handleWatch}
+                  />
+                ))
             ) : (
-              // Feed Videos (Trending + Sponsored)
-              // Native banner after sponsored video, then banner ads after every 2 trending videos (3 times)
+              // Feed Videos (Trending + Sponsored) - ads disabled for app store approval
               displayVideos
                 .filter(video => video.videoId)
-                .flatMap((video, index) => {
-                  const card = (
-                    <VideoCard 
-                      key={video.videoId + '-' + index}
-                      videoId={video.videoId}
-                      title={video.title}
-                      isSponsored={video.isSponsored || false}
-                      onWatch={handleWatch}
-                    />
-                  );
-                  // Native banner ad after sponsored video (index 0)
-                  if (index === 0) {
-                    return [card, <NativeBannerAd key="sponsored-native-ad" className="my-4" />];
-                  }
-                  // Banner ad after 2nd trending video (index 2 = video 3)
-                  if (index === 2) {
-                    return [card, <BannerAd key="feed-ad-1" config={ADSTERRA_BANNERS.feedAd1} className="my-4" />];
-                  }
-                  // Banner ad after 4th trending video (index 4 = video 5)
-                  if (index === 4) {
-                    return [card, <BannerAd key="feed-ad-2" config={ADSTERRA_BANNERS.feedAd2} className="my-4" />];
-                  }
-                  // Banner ad after 6th trending video (index 6 = video 7)
-                  if (index === 6) {
-                    return [card, <BannerAd key="feed-ad-3" config={ADSTERRA_BANNERS.feedAd3} className="my-4" />];
-                  }
-                  return [card];
-                })
+                .map((video, index) => (
+                  <VideoCard 
+                    key={video.videoId + '-' + index}
+                    videoId={video.videoId}
+                    title={video.title}
+                    isSponsored={video.isSponsored || false}
+                    onWatch={handleWatch}
+                  />
+                ))
             )}
 
             {/* Load More Trigger */}
@@ -1516,6 +1393,12 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
       return;
     }
 
+    // COMING SOON - Conversion temporarily disabled for app approval
+    // Will be enabled once we reach 10,000+ users
+    setSuccess('Coming Soon... 🚀 Keep earning $VIDEO tokens! Conversions will be enabled once we reach 10,000+ users.');
+    return;
+
+    /* Original conversion logic - disabled for now
     setIsConverting(true);
     try {
       const res = await fetch('/api/convert', {
@@ -1548,6 +1431,7 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
     } finally {
       setIsConverting(false);
     }
+    */
   };
 
   const wldAmount = amount ? Math.floor(parseInt(amount) / 1000) : 0;
