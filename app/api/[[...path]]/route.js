@@ -357,16 +357,22 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders });
       }
       
-      // ===== SECURITY: Server-side validation =====
+      // ===== STRICT SECURITY: Server-side validation =====
       
-      // 1. Limit max watchedSeconds per request (max 120 seconds = 2 minutes)
-      const MAX_SECONDS_PER_REQUEST = 120;
+      // 1. Validate userId format (must be valid UUID)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        return NextResponse.json({ error: 'Invalid user' }, { status: 400, headers: corsHeaders });
+      }
+      
+      // 2. Limit max watchedSeconds per request (max 65 seconds - slightly over 1 minute for network latency)
+      const MAX_SECONDS_PER_REQUEST = 65;
       const validatedSeconds = Math.min(Math.max(0, Math.floor(watchedSeconds)), MAX_SECONDS_PER_REQUEST);
       
-      // 2. Get user with last_watch_recorded to check rate limiting
+      // 3. Get user with last_watch_recorded to check rate limiting
       const { data: user, error: userError } = await supabase
         .from('users')
-        .select('total_tokens, total_watched_seconds, last_watch_recorded')
+        .select('total_tokens, total_watched_seconds, last_watch_recorded, joined_at')
         .eq('id', userId)
         .single();
       
@@ -374,9 +380,21 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'User not found' }, { status: 404, headers: corsHeaders });
       }
       
-      // 3. Rate limiting: Minimum 30 seconds between API calls
       const now = new Date();
-      const MIN_INTERVAL_SECONDS = 30;
+      
+      // 4. ANTI-CHEAT: Total watch time can never exceed time since account creation
+      const timeSinceJoined = (now - new Date(user.joined_at)) / 1000;
+      if ((user.total_watched_seconds || 0) > timeSinceJoined) {
+        console.warn(`FRAUD DETECTED: User ${userId} has more watch time than account age`);
+        return NextResponse.json({ 
+          tokensEarned: 0, 
+          totalTokens: user.total_tokens,
+          message: 'Account flagged for review'
+        }, { headers: corsHeaders });
+      }
+      
+      // 5. Rate limiting: Minimum 55 seconds between API calls (must actually watch ~1 minute)
+      const MIN_INTERVAL_SECONDS = 55;
       if (user.last_watch_recorded) {
         const lastRecord = new Date(user.last_watch_recorded);
         const elapsedSeconds = (now - lastRecord) / 1000;
@@ -389,10 +407,10 @@ export async function POST(request, { params }) {
           }, { headers: corsHeaders });
         }
         
-        // 4. Validate: claimed watchedSeconds cannot exceed actual elapsed time + buffer
-        const maxPossibleSeconds = elapsedSeconds + 10; // 10 second buffer for network latency
+        // 6. STRICT: claimed watchedSeconds cannot exceed actual elapsed time + 5s buffer
+        const maxPossibleSeconds = elapsedSeconds + 5;
         if (validatedSeconds > maxPossibleSeconds) {
-          console.warn(`Suspicious watch: user ${userId} claimed ${validatedSeconds}s but only ${elapsedSeconds}s elapsed`);
+          console.warn(`FRAUD: user ${userId} claimed ${validatedSeconds}s but only ${elapsedSeconds}s elapsed`);
           return NextResponse.json({ 
             tokensEarned: 0, 
             totalTokens: user.total_tokens,
@@ -401,10 +419,29 @@ export async function POST(request, { params }) {
         }
       }
       
-      // 5. Daily limit: Max 2 hours (7200 seconds) of credited watch time per day
-      const DAILY_LIMIT_SECONDS = 7200;
+      // 7. Per-video limit: Max 30 minutes (1800 seconds) per video per day
+      const MAX_SECONDS_PER_VIDEO_PER_DAY = 1800;
       const today = now.toISOString().split('T')[0];
-      const { data: todayHistory, error: historyCheckError } = await supabase
+      const { data: videoHistory } = await supabase
+        .from('watch_history')
+        .select('watched_seconds')
+        .eq('user_id', userId)
+        .eq('video_id', videoId)
+        .gte('created_at', today + 'T00:00:00.000Z')
+        .lt('created_at', today + 'T23:59:59.999Z');
+      
+      const videoTodaySeconds = (videoHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
+      if (videoTodaySeconds >= MAX_SECONDS_PER_VIDEO_PER_DAY) {
+        return NextResponse.json({ 
+          tokensEarned: 0, 
+          totalTokens: user.total_tokens,
+          message: 'Video limit reached. Watch a different video!'
+        }, { headers: corsHeaders });
+      }
+      
+      // 8. Daily limit: Max 6 hours (21600 seconds) of credited watch time per day
+      const DAILY_LIMIT_SECONDS = 21600;
+      const { data: todayHistory } = await supabase
         .from('watch_history')
         .select('watched_seconds')
         .eq('user_id', userId)
@@ -416,15 +453,35 @@ export async function POST(request, { params }) {
         return NextResponse.json({ 
           tokensEarned: 0, 
           totalTokens: user.total_tokens,
-          message: 'Daily watch limit reached. Come back tomorrow!'
+          message: 'Daily watch limit reached (6 hours). Come back tomorrow!'
         }, { headers: corsHeaders });
       }
       
-      // Cap to remaining daily limit
-      const remainingDailySeconds = DAILY_LIMIT_SECONDS - todayTotalSeconds;
-      const finalWatchedSeconds = Math.min(validatedSeconds, remainingDailySeconds);
+      // 9. Hourly limit: Max 70 minutes per hour (allows some buffer but prevents extreme abuse)
+      const HOURLY_LIMIT_SECONDS = 4200;
+      const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+      const { data: hourHistory } = await supabase
+        .from('watch_history')
+        .select('watched_seconds')
+        .eq('user_id', userId)
+        .gte('created_at', oneHourAgo);
       
-      // 6. SERVER-SIDE token calculation: 2 tokens per minute (regular), 5 for sponsored
+      const hourTotalSeconds = (hourHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
+      if (hourTotalSeconds >= HOURLY_LIMIT_SECONDS) {
+        return NextResponse.json({ 
+          tokensEarned: 0, 
+          totalTokens: user.total_tokens,
+          message: 'Hourly limit reached. Take a short break!'
+        }, { headers: corsHeaders });
+      }
+      
+      // Cap to remaining limits
+      const remainingVideoSeconds = MAX_SECONDS_PER_VIDEO_PER_DAY - videoTodaySeconds;
+      const remainingDailySeconds = DAILY_LIMIT_SECONDS - todayTotalSeconds;
+      const remainingHourlySeconds = HOURLY_LIMIT_SECONDS - hourTotalSeconds;
+      const finalWatchedSeconds = Math.min(validatedSeconds, remainingVideoSeconds, remainingDailySeconds, remainingHourlySeconds);
+      
+      // 10. SERVER-SIDE token calculation: 2 tokens per minute (regular), 5 for sponsored
       // Only award tokens for full minutes watched
       const minutesWatched = Math.floor(finalWatchedSeconds / 60);
       const tokensPerMinute = isSponsored ? 5 : 2;
