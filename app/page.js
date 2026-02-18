@@ -1246,7 +1246,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm flex items-center gap-2">
                   <Globe className="w-4 h-4" />
-                  {txt.faq1Answer} <a href="https://tawk.to/chat/6995c85906c1eb1c32b361e3/1jhohd8cn/" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">https://help.vidlook.app/</a>
+                  {txt.faq1Answer} <a href="https://help.vidlook.app/" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">https://help.vidlook.app/</a>
                 </p>
               </div>
             )}
