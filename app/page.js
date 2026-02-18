@@ -1245,8 +1245,8 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
             {expandedFaq === 1 && (
               <div className="px-4 pb-4">
                 <p className="text-gray-400 text-sm flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  {txt.faq1Answer} <a href="mailto:help@vidlookapp.com" className="text-red-500 hover:underline">help@vidlookapp.com</a>
+                  <Globe className="w-4 h-4" />
+                  {txt.faq1Answer} <a href="https://help.vidlook.app/" target="_blank" rel="noopener noreferrer" className="text-red-500 hover:underline">https://help.vidlook.app/</a>
                 </p>
               </div>
             )}
