@@ -393,8 +393,8 @@ export async function POST(request, { params }) {
         }, { headers: corsHeaders });
       }
       
-      // 5. Rate limiting: Minimum 55 seconds between API calls (must actually watch ~1 minute)
-      const MIN_INTERVAL_SECONDS = 55;
+      // 5. Rate limiting: Minimum 50 seconds between API calls (allows for network latency)
+      const MIN_INTERVAL_SECONDS = 50;
       if (user.last_watch_recorded) {
         const lastRecord = new Date(user.last_watch_recorded);
         const elapsedSeconds = (now - lastRecord) / 1000;
@@ -541,7 +541,13 @@ export async function POST(request, { params }) {
     if (path === '/convert') {
       const { userId, videoTokens } = await request.json();
       
-      if (!userId || !videoTokens) {
+      // Validate userId format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!userId || !uuidRegex.test(userId)) {
+        return NextResponse.json({ error: 'Invalid user' }, { status: 400, headers: corsHeaders });
+      }
+      
+      if (!videoTokens) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders });
       }
       
@@ -605,6 +611,12 @@ export async function POST(request, { params }) {
     // Complete task
     if (path === '/tasks/complete') {
       const { userId, taskId } = await request.json();
+      
+      // Validate userId format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!userId || !uuidRegex.test(userId)) {
+        return NextResponse.json({ error: 'Invalid user' }, { status: 400, headers: corsHeaders });
+      }
       
       const taskRewards = {
         'follow_x': 100,

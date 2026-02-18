@@ -314,13 +314,12 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
     // Send to server every minute - server calculates tokens
     const tokensPerMinute = isSponsored ? 5 : 2;
     if (currentMinute > lastRecordedMinuteRef.current) {
-      const minutesSinceLastRecord = currentMinute - lastRecordedMinuteRef.current;
-      setSessionTokens(prev => prev + (minutesSinceLastRecord * tokensPerMinute));
+      // Always report 1 minute at a time to avoid issues with time jumps
+      setSessionTokens(prev => prev + tokensPerMinute);
       
-      // Report to parent with seconds watched since last record and isSponsored flag
+      // Report exactly 60 seconds per minute watched
       if (onWatch) {
-        const secondsSinceLastRecord = minutesSinceLastRecord * 60;
-        onWatch(videoId, secondsSinceLastRecord, isSponsored);
+        onWatch(videoId, 60, isSponsored);
       }
       lastRecordedMinuteRef.current = currentMinute;
     }
