@@ -351,48 +351,108 @@ export async function POST(request, { params }) {
     
     // Record watch time and award tokens
     if (path === '/watch/record') {
-      const { userId, videoId, watchedSeconds, tokensEarned } = await request.json();
+      const { userId, videoId, watchedSeconds, isSponsored } = await request.json();
       
-      if (!userId || !videoId || watchedSeconds === undefined || !tokensEarned) {
+      if (!userId || !videoId || watchedSeconds === undefined) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders });
       }
       
-      // Use the tokens calculated by the client (incremental per minute)
-      // tokensEarned is already validated client-side as 2 tokens per minute
+      // ===== SECURITY: Server-side validation =====
       
-      if (tokensEarned > 0) {
+      // 1. Limit max watchedSeconds per request (max 120 seconds = 2 minutes)
+      const MAX_SECONDS_PER_REQUEST = 120;
+      const validatedSeconds = Math.min(Math.max(0, Math.floor(watchedSeconds)), MAX_SECONDS_PER_REQUEST);
+      
+      // 2. Get user with last_watch_recorded to check rate limiting
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('total_tokens, total_watched_seconds, last_watch_recorded')
+        .eq('id', userId)
+        .single();
+      
+      if (userError || !user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404, headers: corsHeaders });
+      }
+      
+      // 3. Rate limiting: Minimum 30 seconds between API calls
+      const now = new Date();
+      const MIN_INTERVAL_SECONDS = 30;
+      if (user.last_watch_recorded) {
+        const lastRecord = new Date(user.last_watch_recorded);
+        const elapsedSeconds = (now - lastRecord) / 1000;
+        
+        if (elapsedSeconds < MIN_INTERVAL_SECONDS) {
+          return NextResponse.json({ 
+            tokensEarned: 0, 
+            totalTokens: user.total_tokens,
+            message: 'Please wait before recording again'
+          }, { headers: corsHeaders });
+        }
+        
+        // 4. Validate: claimed watchedSeconds cannot exceed actual elapsed time + buffer
+        const maxPossibleSeconds = elapsedSeconds + 10; // 10 second buffer for network latency
+        if (validatedSeconds > maxPossibleSeconds) {
+          console.warn(`Suspicious watch: user ${userId} claimed ${validatedSeconds}s but only ${elapsedSeconds}s elapsed`);
+          return NextResponse.json({ 
+            tokensEarned: 0, 
+            totalTokens: user.total_tokens,
+            message: 'Invalid watch time'
+          }, { headers: corsHeaders });
+        }
+      }
+      
+      // 5. Daily limit: Max 2 hours (7200 seconds) of credited watch time per day
+      const DAILY_LIMIT_SECONDS = 7200;
+      const today = now.toISOString().split('T')[0];
+      const { data: todayHistory, error: historyCheckError } = await supabase
+        .from('watch_history')
+        .select('watched_seconds')
+        .eq('user_id', userId)
+        .gte('created_at', today + 'T00:00:00.000Z')
+        .lt('created_at', today + 'T23:59:59.999Z');
+      
+      const todayTotalSeconds = (todayHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
+      if (todayTotalSeconds >= DAILY_LIMIT_SECONDS) {
+        return NextResponse.json({ 
+          tokensEarned: 0, 
+          totalTokens: user.total_tokens,
+          message: 'Daily watch limit reached. Come back tomorrow!'
+        }, { headers: corsHeaders });
+      }
+      
+      // Cap to remaining daily limit
+      const remainingDailySeconds = DAILY_LIMIT_SECONDS - todayTotalSeconds;
+      const finalWatchedSeconds = Math.min(validatedSeconds, remainingDailySeconds);
+      
+      // 6. SERVER-SIDE token calculation: 2 tokens per minute (regular), 5 for sponsored
+      // Only award tokens for full minutes watched
+      const minutesWatched = Math.floor(finalWatchedSeconds / 60);
+      const tokensPerMinute = isSponsored ? 5 : 2;
+      const tokensEarned = minutesWatched * tokensPerMinute;
+      
+      if (tokensEarned > 0 || finalWatchedSeconds >= 60) {
         // Record watch history
         const { error: historyError } = await supabase
           .from('watch_history')
           .insert({
             user_id: userId,
             video_id: videoId,
-            watched_seconds: watchedSeconds,
+            watched_seconds: finalWatchedSeconds,
             tokens_earned: tokensEarned
           });
         
         if (historyError) {
-          return NextResponse.json({ error: historyError.message }, { status: 500, headers: corsHeaders });
+          console.error('History insert error:', historyError);
         }
         
-        // Get current user tokens
-        const { data: user, error: userError } = await supabase
-          .from('users')
-          .select('total_tokens, total_watched_seconds')
-          .eq('id', userId)
-          .single();
-        
-        if (userError) {
-          return NextResponse.json({ error: userError.message }, { status: 500, headers: corsHeaders });
-        }
-        
-        // Update user tokens
+        // Update user tokens and last_watch_recorded
         const { error: updateError } = await supabase
           .from('users')
           .update({
             total_tokens: (user.total_tokens || 0) + tokensEarned,
-            total_watched_seconds: (user.total_watched_seconds || 0) + watchedSeconds,
-            updated_at: new Date().toISOString()
+            total_watched_seconds: (user.total_watched_seconds || 0) + finalWatchedSeconds,
+            last_watch_recorded: now.toISOString(),
+            updated_at: now.toISOString()
           })
           .eq('id', userId);
         
@@ -403,12 +463,19 @@ export async function POST(request, { params }) {
         return NextResponse.json({ 
           tokensEarned, 
           totalTokens: (user.total_tokens || 0) + tokensEarned,
-          message: `Earned ${tokensEarned} VIDEO tokens!`
+          message: tokensEarned > 0 ? `Earned ${tokensEarned} VIDEO tokens!` : 'Keep watching to earn tokens!'
         }, { headers: corsHeaders });
       }
       
+      // Update last_watch_recorded even if no tokens earned
+      await supabase
+        .from('users')
+        .update({ last_watch_recorded: now.toISOString() })
+        .eq('id', userId);
+      
       return NextResponse.json({ 
         tokensEarned: 0, 
+        totalTokens: user.total_tokens,
         message: 'Keep watching to earn tokens!'
       }, { headers: corsHeaders });
     }

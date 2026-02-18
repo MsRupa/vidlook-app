@@ -311,17 +311,18 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
     setWatchTime(time);
     const currentMinute = Math.floor(time / 60);
     
-    // Award tokens per minute: 5 for sponsored, 2 for regular
+    // Send to server every minute - server calculates tokens
     const tokensPerMinute = isSponsored ? 5 : 2;
     if (currentMinute > lastRecordedMinuteRef.current) {
-      const newTokens = (currentMinute - lastRecordedMinuteRef.current) * tokensPerMinute;
-      setSessionTokens(prev => prev + newTokens);
-      lastRecordedMinuteRef.current = currentMinute;
+      const minutesSinceLastRecord = currentMinute - lastRecordedMinuteRef.current;
+      setSessionTokens(prev => prev + (minutesSinceLastRecord * tokensPerMinute));
       
-      // Report to parent
+      // Report to parent with seconds watched since last record and isSponsored flag
       if (onWatch) {
-        onWatch(videoId, time, newTokens);
+        const secondsSinceLastRecord = minutesSinceLastRecord * 60;
+        onWatch(videoId, secondsSinceLastRecord, isSponsored);
       }
+      lastRecordedMinuteRef.current = currentMinute;
     }
   }, [videoId, onWatch, isSponsored]);
 
@@ -759,7 +760,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
     setSearchResults([]);
   };
 
-  const handleWatch = useCallback(async (videoId, watchedSeconds, tokensEarned) => {
+  const handleWatch = useCallback(async (videoId, watchedSeconds, isSponsored) => {
     try {
       const res = await fetch('/api/watch/record', {
         method: 'POST',
@@ -768,7 +769,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
           userId: user.id,
           videoId,
           watchedSeconds,
-          tokensEarned // Send the incremental tokens calculated by client
+          isSponsored // Server calculates tokens based on this
         })
       });
       const data = await res.json();
