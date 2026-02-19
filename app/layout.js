@@ -50,6 +50,13 @@ export default function RootLayout({ children }) {
             gtag('config', 'G-JX2DBW24CW');
           `}
         </Script>
+        
+        {/* Google AdSense */}
+        <Script
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9957027590409335"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <MiniKitProvider>
