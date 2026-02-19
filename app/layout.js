@@ -1,6 +1,7 @@
 import './globals.css'
 import Script from 'next/script'
 import { MiniKitProvider } from '@/components/MiniKitProvider'
+import { Toaster } from '@/components/ui/sonner'
 
 export const metadata = {
   title: 'VidLook - Watch YouTube & Earn WLD',
@@ -55,6 +56,7 @@ export default function RootLayout({ children }) {
           <div className="max-w-md mx-auto min-h-screen relative">
             {children}
           </div>
+          <Toaster position="top-center" richColors />
         </MiniKitProvider>
         
         {/* Oculus Analytics for World Mini Apps - must be at end of body */}

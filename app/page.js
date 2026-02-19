@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { useMiniKit } from '@/components/MiniKitProvider';
 import { Button } from '@/components/ui/button';
@@ -305,25 +306,34 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
 function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
   const [watchTime, setWatchTime] = useState(0);
   const [sessionTokens, setSessionTokens] = useState(0);
+  const [pendingMinute, setPendingMinute] = useState(false);
   const lastRecordedMinuteRef = useRef(0);
 
   const handleTimeUpdate = useCallback((time) => {
     setWatchTime(time);
     const currentMinute = Math.floor(time / 60);
     
-    // Send to server every minute - server calculates tokens
-    const tokensPerMinute = isSponsored ? 5 : 2;
-    if (currentMinute > lastRecordedMinuteRef.current) {
-      // Always report 1 minute at a time to avoid issues with time jumps
-      setSessionTokens(prev => prev + tokensPerMinute);
+    // Send to server every minute - wait for confirmation before showing tokens
+    if (currentMinute > lastRecordedMinuteRef.current && !pendingMinute) {
+      lastRecordedMinuteRef.current = currentMinute;
+      setPendingMinute(true);
       
       // Report exactly 60 seconds per minute watched
       if (onWatch) {
-        onWatch(videoId, 60, isSponsored);
+        onWatch(videoId, 60, isSponsored).then((result) => {
+          setPendingMinute(false);
+          if (result && result.tokensEarned > 0) {
+            // Only show tokens AFTER server confirms
+            setSessionTokens(prev => prev + result.tokensEarned);
+          }
+        }).catch(() => {
+          setPendingMinute(false);
+        });
+      } else {
+        setPendingMinute(false);
       }
-      lastRecordedMinuteRef.current = currentMinute;
     }
-  }, [videoId, onWatch, isSponsored]);
+  }, [videoId, onWatch, isSponsored, pendingMinute]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -356,11 +366,19 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
             <Clock className="w-4 h-4" />
             <span>{formatTime(watchTime)}</span>
           </div>
-          {sessionTokens > 0 && (
+          {pendingMinute ? (
+            <Badge className="bg-gray-600 text-gray-300 animate-pulse">
+              Saving...
+            </Badge>
+          ) : sessionTokens > 0 ? (
             <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
               +{sessionTokens} $VIDEO
             </Badge>
-          )}
+          ) : watchTime > 0 && watchTime < 60 ? (
+            <span className="text-xs text-gray-500">
+              {60 - watchTime}s until first token
+            </span>
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -772,11 +790,24 @@ function HomeScreen({ user, onTokensEarned, language }) {
         })
       });
       const data = await res.json();
+      
+      // Update total tokens in UI
       if (data.totalTokens !== undefined && onTokensEarned) {
         onTokensEarned(data.totalTokens);
       }
+      
+      // Show message to user if there's one (rate limits, daily limits, etc.)
+      if (data.message && data.tokensEarned === 0) {
+        // Only show non-success messages
+        if (data.message !== 'Keep watching to earn tokens!') {
+          toast.info(data.message, { duration: 3000 });
+        }
+      }
+      
+      return { tokensEarned: data.tokensEarned || 0, message: data.message };
     } catch (error) {
       console.error('Failed to record watch:', error);
+      return { tokensEarned: 0, message: 'Connection error' };
     }
   }, [user?.id, onTokensEarned]);
 
