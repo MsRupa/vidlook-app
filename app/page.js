@@ -940,10 +940,11 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       isSponsored={video.isSponsored || false}
                       onWatch={handleWatch}
                     />
-                    {/* Show ad after sponsored video (first video) */}
+                    {/* Show ad after sponsored video (first video) - DISABLED UNTIL ADSENSE APPROVED
                     {index === 0 && video.isSponsored && (
                       <GoogleAdUnit slot={ADSENSE_SLOTS.belowSponsoredVideo} />
                     )}
+                    */}
                   </React.Fragment>
                 ))
             )}
