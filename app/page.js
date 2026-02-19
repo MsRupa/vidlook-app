@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { MiniKit } from '@worldcoin/minikit-js';
 import { useMiniKit } from '@/components/MiniKitProvider';
@@ -50,29 +50,46 @@ const LOGO_URL = '/logo.png';
 const SPONSORED_VIDEO_EARN_TEXT = 'Earn 115 $VIDEO';
 
 // ============================================
-// ADSTERRA ADS CONFIGURATION - DISABLED FOR APP STORE APPROVAL
+// GOOGLE ADSENSE CONFIGURATION
 // ============================================
-// Ads temporarily disabled. Keep config for future use when approved with safer ad network.
-// TODO: Replace with Google AdSense or Media.net after getting traffic
-
-/*
-// Native Banner (after sponsored video)
-const ADSTERRA_NATIVE = {
-  key: 'cae4f95eed4d1e4f9d144c0e18d8b6da',
-  src: 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js',
-  containerId: 'container-cae4f95eed4d1e4f9d144c0e18d8b6da'
+const ADSENSE_CLIENT = 'ca-pub-9957027590409335';
+const ADSENSE_SLOTS = {
+  belowSponsoredVideo: '9168291733',
 };
 
-// 6 Banner Ads for Search and Feed sections
-const ADSTERRA_BANNERS = {
-  searchHeader: { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },
-  searchAd1: { key: 'd0b3a57d787c66a60c224207d0cb7bf5', width: 300, height: 250 },
-  searchAd2: { key: 'eb078d99fd9e73467084b64849ed2c56', width: 468, height: 60 },
-  feedAd1: { key: '4b93b1a293b06b300ae9666221ef96db', width: 728, height: 90 },
-  feedAd2: { key: 'c69d985ff1c9f30a2fffc0949cb3448a', width: 160, height: 300 },
-  feedAd3: { key: '1978fdba198639aeec7244e408dbd4a8', width: 160, height: 600 },
-};
-*/
+// Google AdSense Display Ad Component
+function GoogleAdUnit({ slot, className = '' }) {
+  const adRef = useRef(null);
+  const [adLoaded, setAdLoaded] = useState(false);
+
+  useEffect(() => {
+    // Only load ad once and if adsbygoogle is available
+    if (adLoaded || !adRef.current) return;
+    
+    try {
+      if (typeof window !== 'undefined' && window.adsbygoogle) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        setAdLoaded(true);
+      }
+    } catch (e) {
+      console.error('AdSense error:', e);
+    }
+  }, [adLoaded]);
+
+  return (
+    <div className={`ad-container my-4 ${className}`}>
+      <ins
+        ref={adRef}
+        className="adsbygoogle"
+        style={{ display: 'block' }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={slot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
+}
 
 // Country code to name mapping
 const COUNTRY_NAMES = {
@@ -912,17 +929,22 @@ function HomeScreen({ user, onTokensEarned, language }) {
                   />
                 ))
             ) : (
-              // Feed Videos (Trending + Sponsored) - ads disabled for app store approval
+              // Feed Videos (Trending + Sponsored) with Google AdSense
               displayVideos
                 .filter(video => video.videoId)
                 .map((video, index) => (
-                  <VideoCard 
-                    key={video.videoId + '-' + index}
-                    videoId={video.videoId}
-                    title={video.title}
-                    isSponsored={video.isSponsored || false}
-                    onWatch={handleWatch}
-                  />
+                  <React.Fragment key={video.videoId + '-' + index}>
+                    <VideoCard 
+                      videoId={video.videoId}
+                      title={video.title}
+                      isSponsored={video.isSponsored || false}
+                      onWatch={handleWatch}
+                    />
+                    {/* Show ad after sponsored video (first video) */}
+                    {index === 0 && video.isSponsored && (
+                      <GoogleAdUnit slot={ADSENSE_SLOTS.belowSponsoredVideo} />
+                    )}
+                  </React.Fragment>
                 ))
             )}
 
