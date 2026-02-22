@@ -1447,9 +1447,8 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
       return;
     }
 
-    // COMING SOON - Conversion temporarily disabled for app approval
-    // Will be enabled once we reach 10,000+ users
-    setSuccess('Coming Soon... 🚀 Keep earning $VIDEO tokens! Conversions will be enabled once we reach 10,000+ users.');
+    // COMING SOON - Conversion temporarily disabled until April 2026
+    setSuccess(txt.comingSoon);
     return;
 
     /* Original conversion logic - disabled for now
