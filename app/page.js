@@ -735,21 +735,47 @@ function HomeScreen({ user, onTokensEarned, language }) {
     loadVideos();
   }, [user?.country]);
 
-  const loadVideos = async (pageNum = 1) => {
+  const loadVideos = async (pageNum = 1, retryCount = 0) => {
     try {
       setIsLoading(true);
       const res = await fetch(`/api/videos/feed?region=${user?.country || 'US'}&page=${pageNum}&limit=10`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
       const data = await res.json();
       
+      // Check if we got valid data
+      if (!data.videos || data.videos.length === 0) {
+        if (pageNum === 1) {
+          toast.error('No videos available. Pull down to refresh.', { duration: 3000 });
+        }
+        return;
+      }
+      
       if (pageNum === 1) {
-        setVideos(data.videos || []);
+        setVideos(data.videos);
       } else {
-        setVideos(prev => [...prev, ...(data.videos || [])]);
+        setVideos(prev => [...prev, ...data.videos]);
       }
       setHasMore(data.hasMore);
       setPage(pageNum);
     } catch (error) {
       console.error('Failed to load videos:', error);
+      
+      // Retry up to 2 times with exponential backoff
+      if (retryCount < 2) {
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
+        console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 2})`);
+        setTimeout(() => loadVideos(pageNum, retryCount + 1), delay);
+        return;
+      }
+      
+      // Show error only on first page load failure after retries
+      if (pageNum === 1) {
+        toast.error('Failed to load videos. Check your connection.', { duration: 4000 });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -780,10 +806,32 @@ function HomeScreen({ user, onTokensEarned, language }) {
     setIsSearching(true);
     try {
       const res = await fetch(`/api/videos/search?q=${encodeURIComponent(searchQuery)}&region=${user?.country || 'US'}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
       const data = await res.json();
-      setSearchResults(data.items || []);
+      
+      // Handle API-level errors
+      if (data.error === 'search_failed') {
+        toast.error(data.message || 'Search temporarily unavailable', { duration: 4000 });
+        setSearchResults([]);
+        return;
+      }
+      
+      // Handle empty results
+      if (!data.items || data.items.length === 0) {
+        toast.info('No videos found for your search', { duration: 3000 });
+        setSearchResults([]);
+        return;
+      }
+      
+      setSearchResults(data.items);
     } catch (error) {
       console.error('Search failed:', error);
+      toast.error('Search failed. Please try again.', { duration: 3000 });
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }

@@ -63,14 +63,14 @@ export async function GET(request, { params }) {
       const CACHE_TTL = 86400; // 24 hours in seconds
       
       let trendingVideos = [];
+      let usingFallback = false;
       
       try {
-        // Try cache first
+        // Try cache first - Upstash returns objects directly (no JSON.parse needed)
         const cachedData = await getCachedData(cacheKey);
-        if (cachedData) {
-          console.log(`Cache hit for trending videos: ${regionCode}`);
-          const parsed = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
-          trendingVideos = parsed.videos || [];
+        if (cachedData && cachedData.videos && cachedData.videos.length > 0) {
+          console.log(`Cache hit for trending videos: ${regionCode} (${cachedData.videos.length} videos)`);
+          trendingVideos = cachedData.videos;
         } else {
           // Cache miss - fetch from YouTube API
           console.log(`Cache miss for trending videos: ${regionCode}, fetching from API...`);
@@ -85,9 +85,16 @@ export async function GET(request, { params }) {
         }
       } catch (error) {
         console.error('Failed to fetch trending videos, using fallback:', error.message);
+        usingFallback = true;
         // Fallback to curated videos if API fails
         const fallbackIds = getRandomVideosForRegion(regionCode, 40);
-        trendingVideos = fallbackIds.map(id => ({ videoId: id }));
+        trendingVideos = fallbackIds.map(id => ({ 
+          videoId: id,
+          title: 'Popular Video',
+          thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+          channelTitle: '',
+          isFallback: true
+        }));
       }
       
       // Add sponsored video at the top (only on first page)
@@ -125,24 +132,40 @@ export async function GET(request, { params }) {
       // Normalize query: lowercase, trim, collapse multiple spaces
       const normalizedQuery = query.toLowerCase().trim().replace(/\s+/g, ' ');
       const cacheKey = `youtube:search:${normalizedQuery}:${regionCode}`;
-      const SEARCH_CACHE_TTL = 86400; // 24 hours - same as trending
+      const SEARCH_CACHE_TTL = 604800; // 7 days - search results don't change often
       
-      // Try cache first
-      let cachedData = await getCachedData(cacheKey);
-      if (cachedData) {
-        console.log('Search cache hit for:', normalizedQuery);
-        const data = typeof cachedData === 'string' ? JSON.parse(cachedData) : cachedData;
-        return NextResponse.json(data, { headers: corsHeaders });
+      // Try cache first - Upstash returns objects directly
+      try {
+        const cachedData = await getCachedData(cacheKey);
+        if (cachedData && cachedData.items && cachedData.items.length > 0) {
+          console.log('Search cache hit for:', normalizedQuery);
+          return NextResponse.json(cachedData, { headers: corsHeaders });
+        }
+      } catch (cacheError) {
+        console.warn('Cache read failed, will fetch from API:', cacheError.message);
       }
       
-      // Fetch from YouTube API
-      console.log('Search cache miss for:', normalizedQuery);
-      const youtubeData = await searchYoutubeVideos(query, 20, regionCode);
-      
-      // Cache the results for 24 hours
-      await setCachedData(cacheKey, youtubeData, SEARCH_CACHE_TTL);
-      
-      return NextResponse.json(youtubeData, { headers: corsHeaders });
+      // Fetch from YouTube API with error handling
+      try {
+        console.log('Search cache miss for:', normalizedQuery);
+        const youtubeData = await searchYoutubeVideos(query, 20, regionCode);
+        
+        // Cache the results for 7 days
+        if (youtubeData && youtubeData.items) {
+          await setCachedData(cacheKey, youtubeData, SEARCH_CACHE_TTL);
+        }
+        
+        return NextResponse.json(youtubeData, { headers: corsHeaders });
+      } catch (apiError) {
+        console.error('Search API failed:', apiError.message);
+        
+        // Return a structured error response so client can handle it
+        return NextResponse.json({
+          items: [],
+          error: 'search_failed',
+          message: 'Search is temporarily unavailable. Please try again later.'
+        }, { headers: corsHeaders });
+      }
     }
     
     // Get watch history
