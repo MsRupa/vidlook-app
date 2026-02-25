@@ -1641,6 +1641,9 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
           <p className="text-center text-gray-500 text-xs">
             {txt.minimum}
           </p>
+          <p className="text-center text-gray-500 text-xs">
+            {txt.conversionsStartDate}
+          </p>
         </CardContent>
       </Card>
 
