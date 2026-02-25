@@ -449,13 +449,20 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
   useEffect(() => {
     const detectCountry = async () => {
       try {
+        // Skip auto-detection if user has already manually selected a language
+        const savedLanguage = localStorage.getItem('vidlook_language');
+        if (savedLanguage) {
+          console.log('Language already saved, skipping auto-detection:', savedLanguage);
+          return;
+        }
+        
         const res = await fetch('https://api.country.is');
         const data = await res.json();
         if (data.country) {
           setDetectedCountry(data.country);
           console.log('Pre-detected country:', data.country);
           
-          // Auto-set language based on country
+          // Auto-set language based on country (only if no saved preference)
           const detectedLang = getLanguageFromCountry(data.country);
           if (detectedLang !== 'en') {
             onLanguageChange(detectedLang);
@@ -1742,11 +1749,25 @@ export default function App() {
   const [language, setLanguage] = useState('en');
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Handle language change with localStorage persistence
+  const handleLanguageChange = useCallback((newLang) => {
+    setLanguage(newLang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('vidlook_language', newLang);
+    }
+  }, []);
+
   // Check for existing session on app load - uses localStorage for persistence
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
-        // First check localStorage for saved wallet address
+        // Load saved language preference first (before any auto-detection)
+        const savedLanguage = localStorage.getItem('vidlook_language');
+        if (savedLanguage && ['en', 'es', 'th', 'ja'].includes(savedLanguage)) {
+          setLanguage(savedLanguage);
+        }
+        
+        // Check localStorage for saved wallet address
         const savedWalletAddress = localStorage.getItem('vidlook_wallet_address');
         
         if (savedWalletAddress) {
@@ -1756,9 +1777,11 @@ export default function App() {
             const userData = await res.json();
             if (userData && userData.id) {
               setUser(userData);
-              // Set language based on user's country
-              const userLang = getLanguageFromCountry(userData.country);
-              if (userLang !== 'en') setLanguage(userLang);
+              // Only set language based on country if user hasn't manually selected one
+              if (!savedLanguage) {
+                const userLang = getLanguageFromCountry(userData.country);
+                if (userLang !== 'en') setLanguage(userLang);
+              }
               setIsLoading(false);
               setIsInitialized(true);
               return;
@@ -1838,7 +1861,7 @@ export default function App() {
       <WelcomeScreen 
         onConnect={handleConnect} 
         language={language}
-        onLanguageChange={setLanguage}
+        onLanguageChange={handleLanguageChange}
       />
     );
   }
