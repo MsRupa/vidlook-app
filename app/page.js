@@ -98,15 +98,33 @@ function GoogleAdUnit({ slot, className = '' }) {
 // Global ad loading queue to prevent atOptions conflicts
 let adLoadQueue = [];
 let isLoadingAd = false;
+let loadingTimeout = null;
+
+// Safety reset - if isLoadingAd is stuck for more than 5 seconds, reset it
+const safetyResetLoading = () => {
+  if (loadingTimeout) clearTimeout(loadingTimeout);
+  loadingTimeout = setTimeout(() => {
+    if (isLoadingAd) {
+      console.warn('Ad loading timeout - resetting queue');
+      isLoadingAd = false;
+      processAdQueue();
+    }
+  }, 5000);
+};
 
 const processAdQueue = () => {
   if (isLoadingAd || adLoadQueue.length === 0) return;
   
   isLoadingAd = true;
-  const { containerRef, adKey, width, height, onLoad, onError } = adLoadQueue.shift();
+  safetyResetLoading();
   
-  if (!containerRef.current) {
+  const { containerRef, adKey, width, height, onLoad, onError, instanceId } = adLoadQueue.shift();
+  
+  // Check if container still exists in DOM
+  if (!containerRef.current || !document.body.contains(containerRef.current)) {
+    console.log('Ad container not in DOM, skipping:', adKey);
     isLoadingAd = false;
+    if (loadingTimeout) clearTimeout(loadingTimeout);
     processAdQueue();
     return;
   }
@@ -116,6 +134,7 @@ const processAdQueue = () => {
 
   // Create wrapper div for the ad
   const wrapper = document.createElement('div');
+  wrapper.setAttribute('data-ad-instance', instanceId);
 
   // Set global atOptions before loading script
   window.atOptions = {
@@ -126,78 +145,106 @@ const processAdQueue = () => {
     'params': {}
   };
 
-  // Create the invoke script
+  // Create the invoke script with cache busting
   const invokeScript = document.createElement('script');
   invokeScript.type = 'text/javascript';
-  invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+  invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js?t=${Date.now()}-${instanceId}`;
   
-  invokeScript.onerror = () => {
+  const finishLoading = (success) => {
+    if (loadingTimeout) clearTimeout(loadingTimeout);
     isLoadingAd = false;
-    onError && onError();
-    // Process next ad after delay
-    setTimeout(processAdQueue, 100);
-  };
-  
-  invokeScript.onload = () => {
-    isLoadingAd = false;
-    onLoad && onLoad();
+    if (success) {
+      onLoad && onLoad();
+    } else {
+      onError && onError();
+    }
     // Process next ad after a delay to ensure iframe is created
-    setTimeout(processAdQueue, 300);
+    setTimeout(processAdQueue, 500);
   };
+  
+  invokeScript.onerror = () => finishLoading(false);
+  invokeScript.onload = () => finishLoading(true);
   
   wrapper.appendChild(invokeScript);
   containerRef.current.appendChild(wrapper);
 };
 
+// Reset queue when page visibility changes (user returns to tab)
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !isLoadingAd && adLoadQueue.length > 0) {
+      processAdQueue();
+    }
+  });
+}
+
 // Adsterra Native Banner Component - for sponsored video section
 function AdsterraNativeBanner({ className = '' }) {
   const containerRef = useRef(null);
+  const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [loaded, setLoaded] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const [key, setKey] = useState(0); // Force re-render key
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const loadAd = () => {
-      // Check if container already has content (ad loaded)
-      if (containerRef.current && containerRef.current.children.length > 0) {
-        return;
+      // Always remove old scripts to ensure fresh load
+      const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+      existingScripts.forEach(s => s.remove());
+      
+      // Remove any existing container content from previous Adsterra injection
+      const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+      existingContainers.forEach(c => {
+        if (c !== containerRef.current) {
+          c.innerHTML = '';
+        }
+      });
+
+      // Clear our container
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
       }
 
-      // Remove any existing script with this ID to allow reload
-      const existingScript = document.querySelector('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-      if (existingScript && retryCount > 0) {
-        existingScript.remove();
-      }
-
-      if (!existingScript || retryCount > 0) {
-        const script = document.createElement('script');
-        script.src = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
-        script.async = true;
-        script.setAttribute('data-cfasync', 'false');
-        
-        script.onerror = () => {
-          if (retryCount < maxRetries) {
-            setTimeout(() => setRetryCount(c => c + 1), 1000 * (retryCount + 1));
-          }
-        };
-        
-        script.onload = () => setLoaded(true);
-        document.body.appendChild(script);
-      } else {
+      const script = document.createElement('script');
+      script.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
+      script.async = true;
+      script.setAttribute('data-cfasync', 'false');
+      script.setAttribute('data-instance', instanceId.current);
+      
+      script.onerror = () => {
+        console.warn('Native banner failed to load');
+        // Retry after 2 seconds
+        setTimeout(() => setKey(k => k + 1), 2000);
+      };
+      
+      script.onload = () => {
         setLoaded(true);
-      }
+      };
+      
+      document.body.appendChild(script);
     };
 
-    // Small delay to ensure container is in DOM
-    const timer = setTimeout(loadAd, 100);
-    return () => clearTimeout(timer);
-  }, [retryCount]);
+    // Delay to ensure container is in DOM
+    const timer = setTimeout(loadAd, 200);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [key]);
+
+  // Re-trigger load when component mounts (e.g., returning from search)
+  useEffect(() => {
+    setKey(k => k + 1);
+  }, []);
 
   return (
     <div className={`ad-container my-4 flex justify-center ${className}`}>
-      <div id="container-cae4f95eed4d1e4f9d144c0e18d8b6da" ref={containerRef}></div>
+      <div 
+        id="container-cae4f95eed4d1e4f9d144c0e18d8b6da" 
+        ref={containerRef}
+        data-instance={instanceId.current}
+      ></div>
     </div>
   );
 }
@@ -208,35 +255,45 @@ function AdsterraBanner({ adKey, width, height, className = '' }) {
   const [loaded, setLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
-  const uniqueId = useRef(`adsterra-${adKey}-${Math.random().toString(36).substr(2, 9)}`);
-  const addedToQueue = useRef(false);
+  const instanceId = useRef(`banner-${adKey}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const hasQueued = useRef(false);
 
   useEffect(() => {
-    if (!containerRef.current || addedToQueue.current) return;
+    // Reset queue status on mount
+    hasQueued.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
     
-    addedToQueue.current = true;
+    // Don't add to queue if already queued this instance
+    if (hasQueued.current) return;
+    hasQueued.current = true;
     
-    // Add to queue instead of loading immediately
-    adLoadQueue.push({
+    // Add to queue
+    const queueItem = {
       containerRef,
       adKey,
       width,
       height,
+      instanceId: instanceId.current,
       onLoad: () => setLoaded(true),
       onError: () => {
         if (retryCount < maxRetries) {
-          addedToQueue.current = false;
-          setTimeout(() => setRetryCount(c => c + 1), 1000 * (retryCount + 1));
+          hasQueued.current = false;
+          setTimeout(() => setRetryCount(c => c + 1), 2000);
         }
       }
-    });
+    };
+    
+    adLoadQueue.push(queueItem);
     
     // Start processing queue
-    processAdQueue();
+    setTimeout(processAdQueue, 100);
     
     return () => {
       // Remove from queue if component unmounts before loading
-      adLoadQueue = adLoadQueue.filter(item => item.containerRef !== containerRef);
+      adLoadQueue = adLoadQueue.filter(item => item.instanceId !== instanceId.current);
     };
   }, [adKey, width, height, retryCount]);
 
@@ -244,7 +301,7 @@ function AdsterraBanner({ adKey, width, height, className = '' }) {
     <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
       <div 
         ref={containerRef} 
-        id={uniqueId.current}
+        id={instanceId.current}
         style={{ minHeight: height, maxWidth: '100%' }}
       ></div>
     </div>
