@@ -91,6 +91,100 @@ function GoogleAdUnit({ slot, className = '' }) {
   );
 }
 
+// ============================================
+// ADSTERRA AD COMPONENTS
+// ============================================
+
+// Adsterra Native Banner Component - for sponsored video section
+function AdsterraNativeBanner({ className = '' }) {
+  const containerRef = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (loaded || !containerRef.current) return;
+    
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
+      script.async = true;
+      script.setAttribute('data-cfasync', 'false');
+      document.body.appendChild(script);
+    }
+    setLoaded(true);
+  }, [loaded]);
+
+  return (
+    <div className={`ad-container my-4 flex justify-center ${className}`}>
+      <div id="container-cae4f95eed4d1e4f9d144c0e18d8b6da" ref={containerRef}></div>
+    </div>
+  );
+}
+
+// Adsterra Iframe Banner Component - for various banner sizes
+function AdsterraBanner({ adKey, width, height, className = '' }) {
+  const containerRef = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const uniqueId = useRef(`adsterra-${adKey}-${Math.random().toString(36).substr(2, 9)}`);
+
+  useEffect(() => {
+    if (loaded || !containerRef.current) return;
+
+    // Clear the container first
+    containerRef.current.innerHTML = '';
+
+    // Create the options script
+    const optionsScript = document.createElement('script');
+    optionsScript.type = 'text/javascript';
+    optionsScript.text = `
+      atOptions = {
+        'key' : '${adKey}',
+        'format' : 'iframe',
+        'height' : ${height},
+        'width' : ${width},
+        'params' : {}
+      };
+    `;
+    containerRef.current.appendChild(optionsScript);
+
+    // Create the invoke script
+    const invokeScript = document.createElement('script');
+    invokeScript.type = 'text/javascript';
+    invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+    containerRef.current.appendChild(invokeScript);
+
+    setLoaded(true);
+  }, [loaded, adKey, width, height]);
+
+  return (
+    <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
+      <div 
+        ref={containerRef} 
+        id={uniqueId.current}
+        style={{ minHeight: height, maxWidth: '100%' }}
+      ></div>
+    </div>
+  );
+}
+
+// Adsterra Ad Keys Configuration
+const ADSTERRA_ADS = {
+  // Below search first video: 468x60
+  searchFirstVideo: { key: 'eb078d99fd9e73467084b64849ed2c56', width: 468, height: 60 },
+  // Feed ads (rotate these after every 3 videos)
+  feedAds: [
+    { key: 'c69d985ff1c9f30a2fffc0949cb3448a', width: 160, height: 300 },
+    { key: '4b93b1a293b06b300ae9666221ef96db', width: 728, height: 90 },
+    { key: '1978fdba198639aeec7244e408dbd4a8', width: 160, height: 600 },
+  ],
+  // Search ads (rotate these after every 3 videos)
+  searchAds: [
+    { key: 'd0b3a57d787c66a60c224207d0cb7bf5', width: 300, height: 250 },
+    { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },
+  ],
+};
+
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -972,19 +1066,36 @@ function HomeScreen({ user, onTokensEarned, language }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results (ads disabled for app store approval)
+              // Search Results with Adsterra ads
               searchResults
                 .filter(video => video.id?.videoId)
-                .map((video) => (
-                  <VideoCard 
-                    key={video.id.videoId}
-                    videoId={video.id.videoId}
-                    title={video.snippet?.title}
-                    onWatch={handleWatch}
-                  />
+                .map((video, index) => (
+                  <React.Fragment key={video.id.videoId}>
+                    <VideoCard 
+                      videoId={video.id.videoId}
+                      title={video.snippet?.title}
+                      onWatch={handleWatch}
+                    />
+                    {/* Banner 468x60 below search first video */}
+                    {index === 0 && (
+                      <AdsterraBanner 
+                        adKey={ADSTERRA_ADS.searchFirstVideo.key}
+                        width={ADSTERRA_ADS.searchFirstVideo.width}
+                        height={ADSTERRA_ADS.searchFirstVideo.height}
+                      />
+                    )}
+                    {/* Show search ads after every 3 videos (total 2 ads) */}
+                    {index > 0 && (index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.searchAds.length && (
+                      <AdsterraBanner 
+                        adKey={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].key}
+                        width={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].width}
+                        height={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].height}
+                      />
+                    )}
+                  </React.Fragment>
                 ))
             ) : (
-              // Feed Videos (Trending + Sponsored) with Google AdSense
+              // Feed Videos (Trending + Sponsored) with Adsterra ads
               displayVideos
                 .filter(video => video.videoId)
                 .map((video, index) => (
@@ -995,11 +1106,18 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       isSponsored={video.isSponsored || false}
                       onWatch={handleWatch}
                     />
-                    {/* Show ad after sponsored video (first video) - DISABLED UNTIL ADSENSE APPROVED
+                    {/* Native banner below sponsored video (first video) */}
                     {index === 0 && video.isSponsored && (
-                      <GoogleAdUnit slot={ADSENSE_SLOTS.belowSponsoredVideo} />
+                      <AdsterraNativeBanner />
                     )}
-                    */}
+                    {/* Show feed ads after every 3 videos (total 3 ads) */}
+                    {(index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.feedAds.length && (
+                      <AdsterraBanner 
+                        adKey={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].key}
+                        width={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].width}
+                        height={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].height}
+                      />
+                    )}
                   </React.Fragment>
                 ))
             )}
