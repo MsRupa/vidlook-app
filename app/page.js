@@ -99,21 +99,47 @@ function GoogleAdUnit({ slot, className = '' }) {
 function AdsterraNativeBanner({ className = '' }) {
   const containerRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   useEffect(() => {
-    if (loaded || !containerRef.current) return;
-    
-    // Check if script already exists
-    const existingScript = document.querySelector('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.src = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
-      script.async = true;
-      script.setAttribute('data-cfasync', 'false');
-      document.body.appendChild(script);
-    }
-    setLoaded(true);
-  }, [loaded]);
+    if (!containerRef.current) return;
+
+    const loadAd = () => {
+      // Check if container already has content (ad loaded)
+      if (containerRef.current && containerRef.current.children.length > 0) {
+        return;
+      }
+
+      // Remove any existing script with this ID to allow reload
+      const existingScript = document.querySelector('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+      if (existingScript && retryCount > 0) {
+        existingScript.remove();
+      }
+
+      if (!existingScript || retryCount > 0) {
+        const script = document.createElement('script');
+        script.src = 'https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js';
+        script.async = true;
+        script.setAttribute('data-cfasync', 'false');
+        
+        script.onerror = () => {
+          if (retryCount < maxRetries) {
+            setTimeout(() => setRetryCount(c => c + 1), 1000 * (retryCount + 1));
+          }
+        };
+        
+        script.onload = () => setLoaded(true);
+        document.body.appendChild(script);
+      } else {
+        setLoaded(true);
+      }
+    };
+
+    // Small delay to ensure container is in DOM
+    const timer = setTimeout(loadAd, 100);
+    return () => clearTimeout(timer);
+  }, [retryCount]);
 
   return (
     <div className={`ad-container my-4 flex justify-center ${className}`}>
@@ -126,36 +152,60 @@ function AdsterraNativeBanner({ className = '' }) {
 function AdsterraBanner({ adKey, width, height, className = '' }) {
   const containerRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   const uniqueId = useRef(`adsterra-${adKey}-${Math.random().toString(36).substr(2, 9)}`);
 
   useEffect(() => {
-    if (loaded || !containerRef.current) return;
+    if (!containerRef.current) return;
 
-    // Clear the container first
-    containerRef.current.innerHTML = '';
+    const loadAd = () => {
+      // Clear the container
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
 
-    // Create the options script
-    const optionsScript = document.createElement('script');
-    optionsScript.type = 'text/javascript';
-    optionsScript.text = `
-      atOptions = {
-        'key' : '${adKey}',
-        'format' : 'iframe',
-        'height' : ${height},
-        'width' : ${width},
-        'params' : {}
+      // Create wrapper div for the ad
+      const wrapper = document.createElement('div');
+      wrapper.id = `ad-wrapper-${uniqueId.current}`;
+
+      // Create the options script with unique variable name to avoid conflicts
+      const optionsScript = document.createElement('script');
+      optionsScript.type = 'text/javascript';
+      optionsScript.text = `
+        window.atOptions = {
+          'key' : '${adKey}',
+          'format' : 'iframe',
+          'height' : ${height},
+          'width' : ${width},
+          'params' : {}
+        };
+      `;
+      wrapper.appendChild(optionsScript);
+
+      // Create the invoke script
+      const invokeScript = document.createElement('script');
+      invokeScript.type = 'text/javascript';
+      invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+      
+      invokeScript.onerror = () => {
+        if (retryCount < maxRetries) {
+          setTimeout(() => setRetryCount(c => c + 1), 1000 * (retryCount + 1));
+        }
       };
-    `;
-    containerRef.current.appendChild(optionsScript);
+      
+      invokeScript.onload = () => setLoaded(true);
+      wrapper.appendChild(invokeScript);
 
-    // Create the invoke script
-    const invokeScript = document.createElement('script');
-    invokeScript.type = 'text/javascript';
-    invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
-    containerRef.current.appendChild(invokeScript);
+      if (containerRef.current) {
+        containerRef.current.appendChild(wrapper);
+      }
+    };
 
-    setLoaded(true);
-  }, [loaded, adKey, width, height]);
+    // Small delay to ensure container is in DOM
+    const timer = setTimeout(loadAd, 50);
+    return () => clearTimeout(timer);
+  }, [adKey, width, height, retryCount]);
 
   return (
     <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
