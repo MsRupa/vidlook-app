@@ -95,87 +95,126 @@ function GoogleAdUnit({ slot, className = '' }) {
 // ADSTERRA AD COMPONENTS
 // ============================================
 
-// Global ad loading queue to prevent atOptions conflicts
-let adLoadQueue = [];
-let isLoadingAd = false;
-let loadingTimeout = null;
+// Adsterra Iframe Banner Component - uses iframe isolation to prevent atOptions conflicts
+function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 }) {
+  const containerRef = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const iframeRef = useRef(null);
 
-// Safety reset - if isLoadingAd is stuck for more than 5 seconds, reset it
-const safetyResetLoading = () => {
-  if (loadingTimeout) clearTimeout(loadingTimeout);
-  loadingTimeout = setTimeout(() => {
-    if (isLoadingAd) {
-      console.warn('Ad loading timeout - resetting queue');
-      isLoadingAd = false;
-      processAdQueue();
-    }
-  }, 5000);
-};
+  useEffect(() => {
+    if (!containerRef.current) return;
 
-const processAdQueue = () => {
-  if (isLoadingAd || adLoadQueue.length === 0) return;
-  
-  isLoadingAd = true;
-  safetyResetLoading();
-  
-  const { containerRef, adKey, width, height, onLoad, onError, instanceId } = adLoadQueue.shift();
-  
-  // Check if container still exists in DOM
-  if (!containerRef.current || !document.body.contains(containerRef.current)) {
-    console.log('Ad container not in DOM, skipping:', adKey);
-    isLoadingAd = false;
-    if (loadingTimeout) clearTimeout(loadingTimeout);
-    processAdQueue();
-    return;
-  }
+    const loadAd = () => {
+      // Clear container
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
 
-  // Clear the container
-  containerRef.current.innerHTML = '';
+      // Create an iframe to isolate the ad's window context
+      const iframe = document.createElement('iframe');
+      iframe.style.width = `${width}px`;
+      iframe.style.height = `${height}px`;
+      iframe.style.maxWidth = '100%';
+      iframe.style.border = 'none';
+      iframe.style.overflow = 'hidden';
+      iframe.scrolling = 'no';
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allowtransparency', 'true');
+      
+      iframeRef.current = iframe;
+      containerRef.current.appendChild(iframe);
 
-  // Create wrapper div for the ad
-  const wrapper = document.createElement('div');
-  wrapper.setAttribute('data-ad-instance', instanceId);
+      // Wait for iframe to be ready
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          
+          // Write the ad loading code directly into the iframe
+          iframeDoc.open();
+          iframeDoc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { background: transparent; overflow: hidden; }
+              </style>
+            </head>
+            <body>
+              <script>
+                atOptions = {
+                  'key' : '${adKey}',
+                  'format' : 'iframe',
+                  'height' : ${height},
+                  'width' : ${width},
+                  'params' : {}
+                };
+              </` + `script>
+              <script src="https://www.highperformanceformat.com/${adKey}/invoke.js"></` + `script>
+            </body>
+            </html>
+          `);
+          iframeDoc.close();
+          setLoaded(true);
+        } catch (e) {
+          console.error('Failed to load ad:', adKey, e);
+          setError(true);
+        }
+      };
 
-  // Set global atOptions before loading script
-  window.atOptions = {
-    'key': adKey,
-    'format': 'iframe',
-    'height': height,
-    'width': width,
-    'params': {}
-  };
+      // For srcdoc approach (fallback)
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { background: transparent; overflow: hidden; }
+          </style>
+        </head>
+        <body>
+          <script>
+            atOptions = {
+              'key' : '${adKey}',
+              'format' : 'iframe',
+              'height' : ${height},
+              'width' : ${width},
+              'params' : {}
+            };
+          <\\/script>
+          <script src="https://www.highperformanceformat.com/${adKey}/invoke.js"><\\/script>
+        </body>
+        </html>
+      `;
+      
+      // Use srcdoc which is cleaner and works in most browsers
+      iframe.srcdoc = htmlContent.replace(/<\\\//g, '</');
+    };
 
-  // Create the invoke script with cache busting
-  const invokeScript = document.createElement('script');
-  invokeScript.type = 'text/javascript';
-  invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js?t=${Date.now()}-${instanceId}`;
-  
-  const finishLoading = (success) => {
-    if (loadingTimeout) clearTimeout(loadingTimeout);
-    isLoadingAd = false;
-    if (success) {
-      onLoad && onLoad();
-    } else {
-      onError && onError();
-    }
-    // Process next ad after a delay to ensure iframe is created
-    setTimeout(processAdQueue, 500);
-  };
-  
-  invokeScript.onerror = () => finishLoading(false);
-  invokeScript.onload = () => finishLoading(true);
-  
-  wrapper.appendChild(invokeScript);
-  containerRef.current.appendChild(wrapper);
-};
+    // Stagger the ad loading based on loadDelay
+    const timer = setTimeout(loadAd, 300 + (loadDelay * 500));
+    
+    return () => {
+      clearTimeout(timer);
+      if (iframeRef.current && iframeRef.current.parentNode) {
+        iframeRef.current.parentNode.removeChild(iframeRef.current);
+      }
+    };
+  }, [adKey, width, height, loadDelay]);
 
-// Reset queue when page visibility changes (user returns to tab)
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && !isLoadingAd && adLoadQueue.length > 0) {
-      processAdQueue();
-    }
-  });
+  return (
+    <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
+      <div 
+        ref={containerRef}
+        style={{ minHeight: height, maxWidth: '100%' }}
+      ></div>
+    </div>
+  );
 }
 
 // Adsterra Native Banner Component - for sponsored video section
@@ -244,65 +283,6 @@ function AdsterraNativeBanner({ className = '' }) {
         id="container-cae4f95eed4d1e4f9d144c0e18d8b6da" 
         ref={containerRef}
         data-instance={instanceId.current}
-      ></div>
-    </div>
-  );
-}
-
-// Adsterra Iframe Banner Component - for various banner sizes
-function AdsterraBanner({ adKey, width, height, className = '' }) {
-  const containerRef = useRef(null);
-  const [loaded, setLoaded] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
-  const instanceId = useRef(`banner-${adKey}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const hasQueued = useRef(false);
-
-  useEffect(() => {
-    // Reset queue status on mount
-    hasQueued.current = false;
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    
-    // Don't add to queue if already queued this instance
-    if (hasQueued.current) return;
-    hasQueued.current = true;
-    
-    // Add to queue
-    const queueItem = {
-      containerRef,
-      adKey,
-      width,
-      height,
-      instanceId: instanceId.current,
-      onLoad: () => setLoaded(true),
-      onError: () => {
-        if (retryCount < maxRetries) {
-          hasQueued.current = false;
-          setTimeout(() => setRetryCount(c => c + 1), 2000);
-        }
-      }
-    };
-    
-    adLoadQueue.push(queueItem);
-    
-    // Start processing queue
-    setTimeout(processAdQueue, 100);
-    
-    return () => {
-      // Remove from queue if component unmounts before loading
-      adLoadQueue = adLoadQueue.filter(item => item.instanceId !== instanceId.current);
-    };
-  }, [adKey, width, height, retryCount]);
-
-  return (
-    <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
-      <div 
-        ref={containerRef} 
-        id={instanceId.current}
-        style={{ minHeight: height, maxWidth: '100%' }}
       ></div>
     </div>
   );
@@ -1222,6 +1202,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.searchFirstVideo.key}
                         width={ADSTERRA_ADS.searchFirstVideo.width}
                         height={ADSTERRA_ADS.searchFirstVideo.height}
+                        loadDelay={0}
                       />
                     )}
                     {/* Show search ads after every 3 videos (total 2 ads) */}
@@ -1230,6 +1211,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].height}
+                        loadDelay={Math.floor((index + 1) / 3)}
                       />
                     )}
                   </React.Fragment>
@@ -1256,6 +1238,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].height}
+                        loadDelay={Math.floor((index + 1) / 3) - 1}
                       />
                     )}
                   </React.Fragment>
