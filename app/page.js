@@ -95,14 +95,33 @@ function GoogleAdUnit({ slot, className = '' }) {
 // ADSTERRA AD COMPONENTS
 // ============================================
 
+// Detect iOS devices (iPhone, iPad, iPod) - ads disabled on iOS due to App Store policies
+const isIOS = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera || '';
+  // Check for iOS devices
+  return /iPad|iPhone|iPod/.test(userAgent) || 
+    // Check for iPad on iOS 13+ which reports as Mac
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
 // Adsterra Iframe Banner Component - uses iframe isolation to prevent atOptions conflicts
+// DISABLED ON iOS to comply with App Store policies
 function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 }) {
   const containerRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const iframeRef = useRef(null);
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+
+  // Check for iOS on mount
+  useEffect(() => {
+    setIsIOSDevice(isIOS());
+  }, []);
 
   useEffect(() => {
+    // Don't load ads on iOS
+    if (isIOSDevice) return;
     if (!containerRef.current) return;
 
     const loadAd = () => {
@@ -205,7 +224,10 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
         iframeRef.current.parentNode.removeChild(iframeRef.current);
       }
     };
-  }, [adKey, width, height, loadDelay]);
+  }, [adKey, width, height, loadDelay, isIOSDevice]);
+
+  // Don't render anything on iOS
+  if (isIOSDevice) return null;
 
   return (
     <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
@@ -218,13 +240,22 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
 }
 
 // Adsterra Native Banner Component - for sponsored video section
+// DISABLED ON iOS to comply with App Store policies
 function AdsterraNativeBanner({ className = '' }) {
   const containerRef = useRef(null);
   const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [loaded, setLoaded] = useState(false);
   const [key, setKey] = useState(0); // Force re-render key
+  const [isIOSDevice, setIsIOSDevice] = useState(false);
+
+  // Check for iOS on mount
+  useEffect(() => {
+    setIsIOSDevice(isIOS());
+  }, []);
 
   useEffect(() => {
+    // Don't load ads on iOS
+    if (isIOSDevice) return;
     if (!containerRef.current) return;
 
     const loadAd = () => {
@@ -274,8 +305,13 @@ function AdsterraNativeBanner({ className = '' }) {
 
   // Re-trigger load when component mounts (e.g., returning from search)
   useEffect(() => {
-    setKey(k => k + 1);
-  }, []);
+    if (!isIOSDevice) {
+      setKey(k => k + 1);
+    }
+  }, [isIOSDevice]);
+
+  // Don't render anything on iOS
+  if (isIOSDevice) return null;
 
   return (
     <div className={`ad-container my-4 flex justify-center ${className}`}>
