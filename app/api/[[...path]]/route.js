@@ -148,7 +148,9 @@ export async function GET(request, { params }) {
       // Fetch from YouTube API with error handling
       try {
         console.log('Search cache miss for:', normalizedQuery);
+        console.log('Attempting YouTube search with query:', query, 'region:', regionCode);
         const youtubeData = await searchYoutubeVideos(query, 20, regionCode);
+        console.log('YouTube search success, items:', youtubeData?.items?.length || 0);
         
         // Cache the results for 7 days
         if (youtubeData && youtubeData.items) {
@@ -158,12 +160,14 @@ export async function GET(request, { params }) {
         return NextResponse.json(youtubeData, { headers: corsHeaders });
       } catch (apiError) {
         console.error('Search API failed:', apiError.message);
+        console.error('Full error details:', apiError.stack || apiError);
         
         // Return a structured error response so client can handle it
         return NextResponse.json({
           items: [],
           error: 'search_failed',
-          message: 'Search is temporarily unavailable. Please try again later.'
+          message: 'Search is temporarily unavailable. Please try again later.',
+          debug: process.env.NODE_ENV === 'development' ? apiError.message : undefined
         }, { headers: corsHeaders });
       }
     }

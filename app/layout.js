@@ -61,8 +61,14 @@ export default function RootLayout({ children }) {
         {/* Preload Adsterra ad scripts for faster loading */}
         <link rel="preconnect" href="https://pl28574038.effectivegatecpm.com" />
         <link rel="preconnect" href="https://www.highperformanceformat.com" />
+        <link rel="preconnect" href="https://www.adsterratech.com" />
+        <link rel="preconnect" href="https://www.tsyndicate.com" />
         <link rel="dns-prefetch" href="https://pl28574038.effectivegatecpm.com" />
         <link rel="dns-prefetch" href="https://www.highperformanceformat.com" />
+        <link rel="dns-prefetch" href="https://www.adsterratech.com" />
+        <link rel="dns-prefetch" href="https://www.tsyndicate.com" />
+        <link rel="dns-prefetch" href="https://www.adskeeper.co.uk" />
+        <link rel="dns-prefetch" href="https://www.optiserve.net" />
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <MiniKitProvider>

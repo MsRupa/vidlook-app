@@ -95,6 +95,60 @@ function GoogleAdUnit({ slot, className = '' }) {
 // ADSTERRA AD COMPONENTS
 // ============================================
 
+// Global ad loading queue to prevent atOptions conflicts
+let adLoadQueue = [];
+let isLoadingAd = false;
+
+const processAdQueue = () => {
+  if (isLoadingAd || adLoadQueue.length === 0) return;
+  
+  isLoadingAd = true;
+  const { containerRef, adKey, width, height, onLoad, onError } = adLoadQueue.shift();
+  
+  if (!containerRef.current) {
+    isLoadingAd = false;
+    processAdQueue();
+    return;
+  }
+
+  // Clear the container
+  containerRef.current.innerHTML = '';
+
+  // Create wrapper div for the ad
+  const wrapper = document.createElement('div');
+
+  // Set global atOptions before loading script
+  window.atOptions = {
+    'key': adKey,
+    'format': 'iframe',
+    'height': height,
+    'width': width,
+    'params': {}
+  };
+
+  // Create the invoke script
+  const invokeScript = document.createElement('script');
+  invokeScript.type = 'text/javascript';
+  invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
+  
+  invokeScript.onerror = () => {
+    isLoadingAd = false;
+    onError && onError();
+    // Process next ad after delay
+    setTimeout(processAdQueue, 100);
+  };
+  
+  invokeScript.onload = () => {
+    isLoadingAd = false;
+    onLoad && onLoad();
+    // Process next ad after a delay to ensure iframe is created
+    setTimeout(processAdQueue, 300);
+  };
+  
+  wrapper.appendChild(invokeScript);
+  containerRef.current.appendChild(wrapper);
+};
+
 // Adsterra Native Banner Component - for sponsored video section
 function AdsterraNativeBanner({ className = '' }) {
   const containerRef = useRef(null);
@@ -155,56 +209,35 @@ function AdsterraBanner({ adKey, width, height, className = '' }) {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const uniqueId = useRef(`adsterra-${adKey}-${Math.random().toString(36).substr(2, 9)}`);
+  const addedToQueue = useRef(false);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    const loadAd = () => {
-      // Clear the container
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-
-      // Create wrapper div for the ad
-      const wrapper = document.createElement('div');
-      wrapper.id = `ad-wrapper-${uniqueId.current}`;
-
-      // Create the options script with unique variable name to avoid conflicts
-      const optionsScript = document.createElement('script');
-      optionsScript.type = 'text/javascript';
-      optionsScript.text = `
-        window.atOptions = {
-          'key' : '${adKey}',
-          'format' : 'iframe',
-          'height' : ${height},
-          'width' : ${width},
-          'params' : {}
-        };
-      `;
-      wrapper.appendChild(optionsScript);
-
-      // Create the invoke script
-      const invokeScript = document.createElement('script');
-      invokeScript.type = 'text/javascript';
-      invokeScript.src = `https://www.highperformanceformat.com/${adKey}/invoke.js`;
-      
-      invokeScript.onerror = () => {
+    if (!containerRef.current || addedToQueue.current) return;
+    
+    addedToQueue.current = true;
+    
+    // Add to queue instead of loading immediately
+    adLoadQueue.push({
+      containerRef,
+      adKey,
+      width,
+      height,
+      onLoad: () => setLoaded(true),
+      onError: () => {
         if (retryCount < maxRetries) {
+          addedToQueue.current = false;
           setTimeout(() => setRetryCount(c => c + 1), 1000 * (retryCount + 1));
         }
-      };
-      
-      invokeScript.onload = () => setLoaded(true);
-      wrapper.appendChild(invokeScript);
-
-      if (containerRef.current) {
-        containerRef.current.appendChild(wrapper);
       }
+    });
+    
+    // Start processing queue
+    processAdQueue();
+    
+    return () => {
+      // Remove from queue if component unmounts before loading
+      adLoadQueue = adLoadQueue.filter(item => item.containerRef !== containerRef);
     };
-
-    // Small delay to ensure container is in DOM
-    const timer = setTimeout(loadAd, 50);
-    return () => clearTimeout(timer);
   }, [adKey, width, height, retryCount]);
 
   return (
