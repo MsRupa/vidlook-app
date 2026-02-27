@@ -663,9 +663,9 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
         </button>
       )}
 
-      {/* Earning indicator */}
-      {isPlaying && (
-        <div className={`absolute ${isFullscreen ? 'top-3 left-3' : 'top-2 left-2'} bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none`}>
+      {/* Earning indicator - hidden in fullscreen to avoid overlapping video */}
+      {isPlaying && !isFullscreen && (
+        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
           <div className="w-2 h-2 bg-white rounded-full" />
           Earning {isSponsored ? '5' : '2'} $VIDEO/min
         </div>
