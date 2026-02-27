@@ -140,8 +140,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Cover safe area on notched devices */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Force YouTube iframe inside fullscreen overlay to fill */
@@ -157,18 +155,29 @@ body {
   border: 0 !important;
 }
 
-/* When native Fullscreen API is active */
-.video-fullscreen-overlay:fullscreen,
-.video-fullscreen-overlay:-webkit-full-screen {
-  width: 100vw !important;
-  height: 100vh !important;
-  padding: 0 !important;
+/* ===== PORTRAIT MODE: Rotate 90deg to simulate landscape ===== */
+/* When device is in portrait and user enters fullscreen, we rotate the overlay */
+.video-fullscreen-overlay.video-fs-portrait {
+  /* Swap dimensions: width becomes viewport height, height becomes viewport width */
+  width: 100vh !important;
+  height: 100vw !important;
+  /* Center the rotated container */
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) rotate(90deg) !important;
+  transform-origin: center center !important;
 }
 
-.video-fullscreen-overlay:fullscreen iframe,
-.video-fullscreen-overlay:-webkit-full-screen iframe {
+/* Ensure children fill the rotated container */
+.video-fullscreen-overlay.video-fs-portrait > div,
+.video-fullscreen-overlay.video-fs-portrait iframe {
   width: 100% !important;
   height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
 }
 
 /* Custom scrollbar for scroll areas */

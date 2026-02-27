@@ -390,6 +390,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   const [watchTime, setWatchTime] = useState(0);
   const [apiReady, setApiReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
   const intervalRef = useRef(null);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
@@ -560,51 +561,36 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   }, [isPlaying]);
 
   // ===== FULLSCREEN / LANDSCAPE LOGIC =====
+
+  // Check if device is in portrait orientation
+  const checkPortrait = useCallback(() => {
+    return window.innerHeight > window.innerWidth;
+  }, []);
+
   const enterFullscreen = useCallback(async () => {
+    // Detect portrait before entering fullscreen
+    const portrait = checkPortrait();
+    setIsPortrait(portrait);
     setIsFullscreen(true);
     // Prevent background scrolling
     document.body.style.overflow = 'hidden';
-
-    const elem = wrapperRef.current;
-    // Try native Fullscreen API (progressive enhancement)
-    if (elem) {
-      try {
-        if (elem.requestFullscreen) {
-          await elem.requestFullscreen();
-        } else if (elem.webkitRequestFullscreen) {
-          await elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) {
-          await elem.msRequestFullscreen();
-        }
-      } catch (e) {
-        // Fullscreen API failed - CSS fixed fallback is already active
-      }
-    }
 
     // Try to lock orientation to landscape (progressive enhancement)
     try {
       if (screen.orientation && screen.orientation.lock) {
         await screen.orientation.lock('landscape');
+        // If orientation lock succeeded, no CSS rotation needed
+        setIsPortrait(false);
       }
     } catch (e) {
-      // Orientation lock not supported - user can rotate manually
+      // Orientation lock not supported in WebView - CSS rotation will handle it
     }
-  }, []);
+  }, [checkPortrait]);
 
   const exitFullscreen = useCallback(async () => {
     setIsFullscreen(false);
+    setIsPortrait(false);
     document.body.style.overflow = '';
-
-    // Exit native fullscreen if active
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else if (document.webkitFullscreenElement) {
-        await document.webkitExitFullscreen();
-      }
-    } catch (e) {
-      // Already exited
-    }
 
     // Unlock orientation
     try {
@@ -616,28 +602,18 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     }
   }, []);
 
-  // Sync state when native fullscreen exits (e.g. via back button)
+  // Listen for orientation changes while in fullscreen
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const fsElement = document.fullscreenElement || document.webkitFullscreenElement;
-      if (!fsElement && isFullscreen) {
-        setIsFullscreen(false);
-        document.body.style.overflow = '';
-        try {
-          if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-          }
-        } catch (e) {}
-      }
+    if (!isFullscreen) return;
+
+    const handleResize = () => {
+      // If user physically rotated to landscape, remove CSS rotation
+      setIsPortrait(checkPortrait());
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-    };
-  }, [isFullscreen]);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isFullscreen, checkPortrait]);
 
   // Cleanup overflow on unmount
   useEffect(() => {
@@ -653,10 +629,15 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     };
   }, [isFullscreen]);
 
+  // Build fullscreen class name
+  const fullscreenClass = isFullscreen
+    ? `video-fullscreen-overlay${isPortrait ? ' video-fs-portrait' : ''}`
+    : 'relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900';
+
   return (
     <div
       ref={wrapperRef}
-      className={isFullscreen ? 'video-fullscreen-overlay' : 'relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900'}
+      className={fullscreenClass}
     >
       <div ref={containerRef} className="w-full h-full" />
 
