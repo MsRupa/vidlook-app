@@ -38,7 +38,8 @@ import {
   HelpCircle,
   Mail,
   Globe,
-  AlertTriangle
+  AlertTriangle,
+  Maximize2
 } from 'lucide-react';
 
 const LOGO_URL = '/logo.png';
@@ -388,9 +389,11 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchTime, setWatchTime] = useState(0);
   const [apiReady, setApiReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const intervalRef = useRef(null);
   const playerRef = useRef(null);
   const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
   const accumulatedTimeRef = useRef(0);
   const lastTickRef = useRef(null);
   
@@ -556,11 +559,132 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying]);
 
+  // ===== FULLSCREEN / LANDSCAPE LOGIC =====
+  const enterFullscreen = useCallback(async () => {
+    setIsFullscreen(true);
+    // Prevent background scrolling
+    document.body.style.overflow = 'hidden';
+
+    const elem = wrapperRef.current;
+    // Try native Fullscreen API (progressive enhancement)
+    if (elem) {
+      try {
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+      } catch (e) {
+        // Fullscreen API failed - CSS fixed fallback is already active
+      }
+    }
+
+    // Try to lock orientation to landscape (progressive enhancement)
+    try {
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      }
+    } catch (e) {
+      // Orientation lock not supported - user can rotate manually
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    setIsFullscreen(false);
+    document.body.style.overflow = '';
+
+    // Exit native fullscreen if active
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (document.webkitFullscreenElement) {
+        await document.webkitExitFullscreen();
+      }
+    } catch (e) {
+      // Already exited
+    }
+
+    // Unlock orientation
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (e) {
+      // Not supported
+    }
+  }, []);
+
+  // Sync state when native fullscreen exits (e.g. via back button)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const fsElement = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!fsElement && isFullscreen) {
+        setIsFullscreen(false);
+        document.body.style.overflow = '';
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        } catch (e) {}
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, [isFullscreen]);
+
+  // Cleanup overflow on unmount
+  useEffect(() => {
+    return () => {
+      if (isFullscreen) {
+        document.body.style.overflow = '';
+        try {
+          if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+          }
+        } catch (e) {}
+      }
+    };
+  }, [isFullscreen]);
+
   return (
-    <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900">
+    <div
+      ref={wrapperRef}
+      className={isFullscreen ? 'video-fullscreen-overlay' : 'relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900'}
+    >
       <div ref={containerRef} className="w-full h-full" />
+
+      {/* Fullscreen toggle button */}
+      {!isFullscreen && (
+        <button
+          onClick={(e) => { e.stopPropagation(); enterFullscreen(); }}
+          className="absolute bottom-2 right-2 bg-black/70 text-white p-1.5 rounded-md z-20 active:bg-black/90 transition-colors"
+          aria-label="Enter fullscreen landscape mode"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Exit fullscreen button */}
+      {isFullscreen && (
+        <button
+          onClick={(e) => { e.stopPropagation(); exitFullscreen(); }}
+          className="absolute top-3 right-3 bg-black/70 text-white p-2.5 rounded-full z-[10001] active:bg-black/90 transition-colors"
+          aria-label="Exit fullscreen"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Earning indicator */}
       {isPlaying && (
-        <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none">
+        <div className={`absolute ${isFullscreen ? 'top-3 left-3' : 'top-2 left-2'} bg-red-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 animate-pulse z-10 pointer-events-none`}>
           <div className="w-2 h-2 bg-white rounded-full" />
           Earning {isSponsored ? '5' : '2'} $VIDEO/min
         </div>
