@@ -23,7 +23,9 @@ export async function GET(request, { params }) {
   try {
     // Health check
     if (path === '/' || path === '') {
-      return NextResponse.json({ status: 'ok', message: 'VidLook API is running' }, { headers: corsHeaders });
+      return NextResponse.json({ status: 'ok', message: 'VidLook API is running' }, { 
+        headers: { ...corsHeaders, 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=86400' } 
+      });
     }
     
     // Get user by wallet address
@@ -116,7 +118,7 @@ export async function GET(request, { params }) {
         page,
         total: allVideos.length,
         region: regionCode
-      }, { headers: corsHeaders });
+      }, { headers: { ...corsHeaders, 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200' } });
     }
     
     // Search videos with caching
@@ -139,7 +141,9 @@ export async function GET(request, { params }) {
         const cachedData = await getCachedData(cacheKey);
         if (cachedData && cachedData.items && cachedData.items.length > 0) {
           console.log('Search cache hit for:', normalizedQuery);
-          return NextResponse.json(cachedData, { headers: corsHeaders });
+          return NextResponse.json(cachedData, { 
+            headers: { ...corsHeaders, 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } 
+          });
         }
       } catch (cacheError) {
         console.warn('Cache read failed, will fetch from API:', cacheError.message);
@@ -157,7 +161,9 @@ export async function GET(request, { params }) {
           await setCachedData(cacheKey, youtubeData, SEARCH_CACHE_TTL);
         }
         
-        return NextResponse.json(youtubeData, { headers: corsHeaders });
+        return NextResponse.json(youtubeData, { 
+          headers: { ...corsHeaders, 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } 
+        });
       } catch (apiError) {
         console.error('Search API failed:', apiError.message);
         console.error('Full error details:', apiError.stack || apiError);
