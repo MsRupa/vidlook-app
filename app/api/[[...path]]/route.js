@@ -58,7 +58,12 @@ export async function GET(request, { params }) {
       const url = new URL(request.url);
       const regionCode = url.searchParams.get('region') || 'US';
       const page = parseInt(url.searchParams.get('page') || '1');
-      const limit = parseInt(url.searchParams.get('limit') || '10');
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '10'), 10); // Max 10 per page
+      
+      // Reject obviously invalid parameters
+      if (page < 1 || page > 20 || isNaN(page)) {
+        return NextResponse.json({ error: 'Invalid page parameter' }, { status: 400, headers: corsHeaders });
+      }
       
       // Cache key for trending videos - one per country, refreshes daily
       const cacheKey = `trending:${regionCode}`;

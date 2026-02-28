@@ -94,6 +94,23 @@ export function middleware(request) {
 
   // --- 3. API route protection ---
   if (pathname.startsWith('/api/')) {
+    // Block requests where Referer is the API URL itself (self-referencing loop / bots)
+    const referer = request.headers.get('referer') || '';
+    if (referer.includes('/api/')) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 403 }
+      );
+    }
+
+    // Block direct API access from desktop browsers (must come from the app)
+    if (isDesktopBrowser(ua)) {
+      return NextResponse.json(
+        { error: 'Access denied' },
+        { status: 403 }
+      );
+    }
+
     // Rate limit API calls
     const { allowed, remaining } = checkRateLimit(ip, 'api', RATE_LIMIT_MAX_API);
     if (!allowed) {

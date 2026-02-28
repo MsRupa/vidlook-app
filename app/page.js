@@ -1087,8 +1087,10 @@ function HomeScreen({ user, onTokensEarned, language }) {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const observerRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const loadingRef = useRef(false); // Prevent concurrent loads
 
   const txt = translations[language]?.home || translations['en'].home;
 
@@ -1098,8 +1100,14 @@ function HomeScreen({ user, onTokensEarned, language }) {
   }, [user?.country]);
 
   const loadVideos = async (pageNum = 1, retryCount = 0) => {
+    // Prevent concurrent/duplicate loads
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    
     try {
-      setIsLoading(true);
+      if (pageNum === 1) setIsLoading(true);
+      else setLoadingMore(true);
+      
       const res = await fetch(`/api/videos/feed?region=${user?.country || 'US'}&page=${pageNum}&limit=10`);
       
       if (!res.ok) {
@@ -1130,6 +1138,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
       if (retryCount < 2) {
         const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
         console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 2})`);
+        loadingRef.current = false; // Allow retry
         setTimeout(() => loadVideos(pageNum, retryCount + 1), delay);
         return;
       }
@@ -1140,26 +1149,36 @@ function HomeScreen({ user, onTokensEarned, language }) {
       }
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
+      loadingRef.current = false;
     }
   };
 
-  // Infinite scroll
+  // Infinite scroll - stable observer, no re-creation on state changes
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoading) {
-          loadVideos(page + 1);
+        if (entries[0].isIntersecting && !loadingRef.current) {
+          // Read current values from state via functional updates
+          setPage(currentPage => {
+            setHasMore(currentHasMore => {
+              if (currentHasMore) {
+                loadVideos(currentPage + 1);
+              }
+              return currentHasMore;
+            });
+            return currentPage;
+          });
         }
       },
       { threshold: 0.1 }
     );
 
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
+    const el = loadMoreRef.current;
+    if (el) observer.observe(el);
 
     return () => observer.disconnect();
-  }, [hasMore, isLoading, page]);
+  }, []); // Empty deps - create observer once
 
   const handleSearch = async (e) => {
     e.preventDefault();
