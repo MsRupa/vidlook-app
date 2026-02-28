@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 // ============================================
 // EDGE MIDDLEWARE - Bot Protection & Rate Limiting
 // Runs at Vercel's edge BEFORE function invocations
+// Designed to protect against abuse WITHOUT breaking
+// the World App mini-app experience or Adsterra ads.
 // ============================================
 
 // Allowed origins - only your domain can call the API
@@ -15,7 +17,7 @@ const ALLOWED_ORIGINS = [
 
 // Known bot/crawler user agent patterns to block
 const BOT_PATTERNS = [
-  /bot/i, /crawl/i, /spider/i, /scrape/i, /lighthouse/i,
+  /bot\b/i, /crawl/i, /spider/i, /scrape/i, /lighthouse/i,
   /headless/i, /phantom/i, /selenium/i, /puppeteer/i,
   /wget/i, /curl\//i, /python-requests/i, /axios\//i,
   /node-fetch/i, /go-http/i, /java\//i, /okhttp/i,
@@ -31,8 +33,8 @@ const BOT_PATTERNS = [
 // Simple in-memory rate limiter using Map (resets on cold start, which is fine)
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_API = 30;       // max 30 API requests per minute per IP (reduced from 60)
-const RATE_LIMIT_MAX_PAGE = 15;      // max 15 page loads per minute per IP (reduced from 30)
+const RATE_LIMIT_MAX_API = 60;       // max 60 API requests per minute per IP (enough for real users)
+const RATE_LIMIT_MAX_PAGE = 30;      // max 30 page loads per minute per IP
 const CLEANUP_INTERVAL = 5 * 60 * 1000;
 let lastCleanup = Date.now();
 
@@ -82,10 +84,18 @@ function checkRateLimit(ip, prefix, max) {
   return { allowed: true, remaining: max - entry.count };
 }
 
+// Desktop browser detection - blocks automated scripts using desktop Chrome/Firefox UA
 function isDesktopBrowser(ua) {
   if (!ua) return false;
   return /Windows NT|Macintosh|X11/.test(ua) && 
-         !/Mobile|Android|wv\)/.test(ua);
+         !/Mobile|Android|wv\)|iPhone|iPad|iPod/.test(ua);
+}
+
+// Detect if UA looks like a legitimate mobile device / WebView
+// World App uses Android WebView (wv) or iOS WKWebView
+function isMobileOrWebView(ua) {
+  if (!ua) return false;
+  return /Mobile|Android|iPhone|iPad|iPod|wv\)|WebKit.*Mobile|CriOS|FxiOS|World/i.test(ua);
 }
 
 function isValidOrigin(referer, origin) {
@@ -117,31 +127,37 @@ export function middleware(request) {
     return new NextResponse('Not allowed', { status: 403 });
   }
 
-  // --- 3. API route protection (strictest) ---
+  // --- 3. API route protection ---
   if (pathname.startsWith('/api/')) {
     const referer = request.headers.get('referer') || '';
     const origin = request.headers.get('origin') || '';
 
-    // Block requests where Referer is an API URL (self-referencing loop)
+    // Block requests where Referer is an API URL (self-referencing loop attack)
     if (referer.includes('/api/')) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 403 });
     }
 
-    // CRITICAL: Only allow API requests that come from your own domain
-    // Browser fetch() calls include Origin or Referer headers automatically
-    // Direct API hits (curl, scripts, bots) won't have valid origin
+    // Origin/Referer validation (flexible for WebView compatibility)
+    // Some WebViews (iOS WKWebView, World App) may strip Referer/Origin headers
+    // due to privacy settings. We must NOT block those legitimate requests.
     if (referer || origin) {
-      // If headers are present, they must match allowed origins
+      // Headers are present — they MUST match our allowed origins
+      // This blocks cross-origin attacks from foreign websites/scripts
       if (!isValidOrigin(referer, origin)) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 });
       }
     } else {
-      // No referer AND no origin = direct API hit (not from a browser page)
-      // Block completely — real app requests always have at least a Referer
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      // No Referer AND no Origin headers present
+      // This could be:
+      // a) A WebView that strips these headers (legitimate) → allow if mobile UA
+      // b) A direct script/curl hit (abuse) → block if not mobile UA
+      if (!isMobileOrWebView(ua)) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+      // Mobile UA without referer = probably a WebView stripping headers → allow
     }
 
-    // Block desktop browsers on API routes
+    // Block desktop browsers on API routes (the bot attack used desktop Chrome)
     if (isDesktopBrowser(ua)) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
@@ -196,7 +212,12 @@ export function middleware(request) {
   return NextResponse.next();
 }
 
-// Only run middleware on these paths
+// Only run middleware on these paths — does NOT affect:
+// - Static assets (_next/static/*)
+// - Images (_next/image/*)  
+// - Adsterra ad scripts (loaded from external domains)
+// - YouTube IFrame API (loaded from youtube.com)
+// - External API calls (api.country.is, etc.)
 export const config = {
   matcher: [
     '/api/:path*',
