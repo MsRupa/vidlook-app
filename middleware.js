@@ -5,6 +5,14 @@ import { NextResponse } from 'next/server';
 // Runs at Vercel's edge BEFORE function invocations
 // ============================================
 
+// Allowed origins - only your domain can call the API
+const ALLOWED_ORIGINS = [
+  'https://vidlook.app',
+  'https://www.vidlook.app',
+  'http://localhost:3000',  // dev
+  'http://localhost:3001',
+];
+
 // Known bot/crawler user agent patterns to block
 const BOT_PATTERNS = [
   /bot/i, /crawl/i, /spider/i, /scrape/i, /lighthouse/i,
@@ -16,29 +24,41 @@ const BOT_PATTERNS = [
   /ia_archiver/i, /webmon/i, /httrack/i, /grub/i,
   /netresearchserver/i, /speedy/i, /fluffy/i, /findlink/i,
   /panscient/i, /ips-agent/i, /yanga/i, /cyberpatrol/i,
-  /postman/i, /insomnia/i,
+  /postman/i, /insomnia/i, /aiohttp/i, /httpx/i,
+  /scrapy/i, /mechanize/i, /request\//i, /fetch\//i,
 ];
 
 // Simple in-memory rate limiter using Map (resets on cold start, which is fine)
-// Key: IP, Value: { count, windowStart }
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_API = 60;       // max 60 API requests per minute per IP
-const RATE_LIMIT_MAX_PAGE = 30;      // max 30 page loads per minute per IP
-const CLEANUP_INTERVAL = 5 * 60 * 1000; // cleanup old entries every 5 min
+const RATE_LIMIT_MAX_API = 30;       // max 30 API requests per minute per IP (reduced from 60)
+const RATE_LIMIT_MAX_PAGE = 15;      // max 15 page loads per minute per IP (reduced from 30)
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
 let lastCleanup = Date.now();
+
+// Track abusive IPs that hit rate limit multiple times
+const abuseMap = new Map();
+const ABUSE_THRESHOLD = 3;           // 3 rate-limit hits = blocked for 1 hour
+const ABUSE_BLOCK_DURATION = 60 * 60 * 1000; // 1 hour block
 
 function checkRateLimit(ip, prefix, max) {
   const now = Date.now();
   const key = `${prefix}:${ip}`;
 
-  // Periodic cleanup to prevent memory leak
+  // Check if IP is in abuse block
+  const abuseEntry = abuseMap.get(ip);
+  if (abuseEntry && abuseEntry.blockedUntil > now) {
+    return { allowed: false, remaining: 0, blocked: true };
+  }
+
+  // Periodic cleanup
   if (now - lastCleanup > CLEANUP_INTERVAL) {
     lastCleanup = now;
     for (const [k, v] of rateLimitMap) {
-      if (now - v.windowStart > RATE_LIMIT_WINDOW * 2) {
-        rateLimitMap.delete(k);
-      }
+      if (now - v.windowStart > RATE_LIMIT_WINDOW * 2) rateLimitMap.delete(k);
+    }
+    for (const [k, v] of abuseMap) {
+      if (v.blockedUntil < now) abuseMap.delete(k);
     }
   }
 
@@ -50,27 +70,32 @@ function checkRateLimit(ip, prefix, max) {
 
   entry.count++;
   if (entry.count > max) {
+    // Track repeated abuse
+    const abuse = abuseMap.get(ip) || { hits: 0, blockedUntil: 0 };
+    abuse.hits++;
+    if (abuse.hits >= ABUSE_THRESHOLD) {
+      abuse.blockedUntil = now + ABUSE_BLOCK_DURATION;
+    }
+    abuseMap.set(ip, abuse);
     return { allowed: false, remaining: 0 };
   }
   return { allowed: true, remaining: max - entry.count };
 }
 
-// Check if this looks like a real mobile WebView (World App)  
-function isLikelyWebView(ua) {
-  if (!ua) return false;
-  // World App runs in Android WebView (wv) or iOS WKWebView
-  return /wv\)|WebView|MiniKit/i.test(ua) || 
-         // iOS WebView typically doesn't have "Safari" at the end
-         (/iPhone|iPad/.test(ua) && !/Safari\//.test(ua)) ||
-         // Android WebView
-         /; wv\)/.test(ua);
-}
-
 function isDesktopBrowser(ua) {
   if (!ua) return false;
-  // Desktop Chrome/Firefox/Edge on Windows/Mac/Linux - NOT a mobile webview
   return /Windows NT|Macintosh|X11/.test(ua) && 
          !/Mobile|Android|wv\)/.test(ua);
+}
+
+function isValidOrigin(referer, origin) {
+  // Check if the request comes from an allowed origin
+  for (const allowed of ALLOWED_ORIGINS) {
+    if (referer.startsWith(allowed) || origin === allowed) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function middleware(request) {
@@ -87,39 +112,49 @@ export function middleware(request) {
     }
   }
 
-  // --- 2. Block empty user agents (automated scripts) ---
+  // --- 2. Block empty/tiny user agents (automated scripts) ---
   if (!ua || ua.length < 10) {
     return new NextResponse('Not allowed', { status: 403 });
   }
 
-  // --- 3. API route protection ---
+  // --- 3. API route protection (strictest) ---
   if (pathname.startsWith('/api/')) {
-    // Block requests where Referer is the API URL itself (self-referencing loop / bots)
     const referer = request.headers.get('referer') || '';
+    const origin = request.headers.get('origin') || '';
+
+    // Block requests where Referer is an API URL (self-referencing loop)
     if (referer.includes('/api/')) {
-      return NextResponse.json(
-        { error: 'Invalid request' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Invalid request' }, { status: 403 });
     }
 
-    // Block direct API access from desktop browsers (must come from the app)
+    // CRITICAL: Only allow API requests that come from your own domain
+    // Browser fetch() calls include Origin or Referer headers automatically
+    // Direct API hits (curl, scripts, bots) won't have valid origin
+    if (referer || origin) {
+      // If headers are present, they must match allowed origins
+      if (!isValidOrigin(referer, origin)) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+    } else {
+      // No referer AND no origin = direct API hit (not from a browser page)
+      // Block completely — real app requests always have at least a Referer
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
+    // Block desktop browsers on API routes
     if (isDesktopBrowser(ua)) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Rate limit API calls
-    const { allowed, remaining } = checkRateLimit(ip, 'api', RATE_LIMIT_MAX_API);
+    const { allowed, remaining, blocked } = checkRateLimit(ip, 'api', RATE_LIMIT_MAX_API);
     if (!allowed) {
       return NextResponse.json(
-        { error: 'Too many requests. Please slow down.' },
+        { error: blocked ? 'IP temporarily blocked due to abuse.' : 'Too many requests. Please slow down.' },
         { 
           status: 429, 
           headers: { 
-            'Retry-After': '60',
+            'Retry-After': blocked ? '3600' : '60',
             'X-RateLimit-Limit': String(RATE_LIMIT_MAX_API),
             'X-RateLimit-Remaining': '0',
           } 
@@ -127,17 +162,15 @@ export function middleware(request) {
       );
     }
 
-    // Add rate limit headers to API responses
     const response = NextResponse.next();
     response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX_API));
     response.headers.set('X-RateLimit-Remaining', String(remaining));
     return response;
   }
 
-  // --- 4. Page route protection (main page) ---
+  // --- 4. Page route protection ---
   if (pathname === '/' || pathname === '') {
-    // Block desktop browsers - this is a mobile-only World App mini-app
-    // Desktop traffic generating millions of requests is certainly bots/scrapers
+    // Block desktop browsers — mobile-only app
     if (isDesktopBrowser(ua)) {
       return new NextResponse(
         `<!DOCTYPE html><html><head><title>VidLook</title></head><body style="background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center">
@@ -163,12 +196,10 @@ export function middleware(request) {
   return NextResponse.next();
 }
 
-// Only run middleware on these paths (skip static files, _next, etc.)
+// Only run middleware on these paths
 export const config = {
   matcher: [
-    // Match all API routes
     '/api/:path*',
-    // Match the main page
     '/',
   ],
 };
