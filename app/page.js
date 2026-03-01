@@ -247,12 +247,9 @@ function AdsterraNativeBanner({ className = '' }) {
   const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [loaded, setLoaded] = useState(false);
   const [key, setKey] = useState(0); // Force re-render key
-  const [isIOSDevice, setIsIOSDevice] = useState(false);
 
-  // Check for iOS on mount
-  useEffect(() => {
-    setIsIOSDevice(isIOS());
-  }, []);
+  // Synchronous iOS check
+  const isIOSDevice = typeof window !== 'undefined' && isIOS();
 
   useEffect(() => {
     // Don't load ads on iOS
@@ -296,12 +293,8 @@ function AdsterraNativeBanner({ className = '' }) {
       document.body.appendChild(script);
     };
 
-    // Delay to ensure container is in DOM
-    const timer = setTimeout(loadAd, 200);
-    
-    return () => {
-      clearTimeout(timer);
-    };
+    // Load immediately - no delay needed since container ref is ready
+    loadAd();
   }, [key]);
 
   // Re-trigger load when component mounts (e.g., returning from search)
@@ -1089,15 +1082,10 @@ function HomeScreen({ user, onTokensEarned, language }) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const observerRef = useRef(null);
-  const loadMoreRef = useRef(null);
   const loadingRef = useRef(false); // Prevent concurrent loads
+  const loadVideosRef = useRef(null); // Always points to latest loadVideos
 
   const txt = translations[language]?.home || translations['en'].home;
-
-  // Load initial videos
-  useEffect(() => {
-    loadVideos();
-  }, [user?.country]);
 
   const loadVideos = async (pageNum = 1, retryCount = 0) => {
     // Prevent concurrent/duplicate loads
@@ -1118,6 +1106,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
       
       // Check if we got valid data
       if (!data.videos || data.videos.length === 0) {
+        setHasMore(false); // No more videos — stop trying
         if (pageNum === 1) {
           toast.error('No videos available. Pull down to refresh.', { duration: 3000 });
         }
@@ -1154,16 +1143,28 @@ function HomeScreen({ user, onTokensEarned, language }) {
     }
   };
 
-  // Infinite scroll - stable observer, no re-creation on state changes
+  // Keep ref in sync so observer always calls latest loadVideos
+  loadVideosRef.current = loadVideos;
+
+  // Load initial videos
   useEffect(() => {
-    const observer = new IntersectionObserver(
+    loadVideos();
+  }, [user?.country]);
+
+  // Infinite scroll using callback ref — attaches observer when sentinel mounts
+  const loadMoreCallbackRef = useCallback((node) => {
+    if (observerRef.current) observerRef.current.disconnect();
+    if (!node) return;
+
+    observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !loadingRef.current) {
-          // Read current values from state via functional updates
+          // Read current page/hasMore via functional state updates
           setPage(currentPage => {
             setHasMore(currentHasMore => {
               if (currentHasMore) {
-                loadVideos(currentPage + 1);
+                // Use ref to call the latest loadVideos (not a stale closure)
+                loadVideosRef.current(currentPage + 1);
               }
               return currentHasMore;
             });
@@ -1174,11 +1175,8 @@ function HomeScreen({ user, onTokensEarned, language }) {
       { threshold: 0.1 }
     );
 
-    const el = loadMoreRef.current;
-    if (el) observer.observe(el);
-
-    return () => observer.disconnect();
-  }, []); // Empty deps - create observer once
+    observerRef.current.observe(node);
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -1405,10 +1403,10 @@ function HomeScreen({ user, onTokensEarned, language }) {
                 ))
             )}
 
-            {/* Load More Trigger */}
+            {/* Load More Trigger — uses callback ref so observer attaches when sentinel appears */}
             {hasMore && searchResults.length === 0 && (
-              <div ref={loadMoreRef} className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 text-red-500 animate-spin" />
+              <div ref={loadMoreCallbackRef} className="flex items-center justify-center py-8">
+                {loadingMore && <Loader2 className="w-6 h-6 text-red-500 animate-spin" />}
               </div>
             )}
           </>
