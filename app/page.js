@@ -111,27 +111,20 @@ const isIOS = () => {
 function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 }) {
   const containerRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
   const iframeRef = useRef(null);
-  const [isIOSDevice, setIsIOSDevice] = useState(false);
 
-  // Check for iOS on mount
-  useEffect(() => {
-    setIsIOSDevice(isIOS());
-  }, []);
+  // Synchronous iOS check — no extra render cycle needed
+  const isIOSDevice = typeof window !== 'undefined' && isIOS();
 
   useEffect(() => {
-    // Don't load ads on iOS
     if (isIOSDevice) return;
     if (!containerRef.current) return;
 
     const loadAd = () => {
-      // Clear container
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
 
-      // Create an iframe to isolate the ad's window context
       const iframe = document.createElement('iframe');
       iframe.style.width = `${width}px`;
       iframe.style.height = `${height}px`;
@@ -145,89 +138,26 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
       iframeRef.current = iframe;
       containerRef.current.appendChild(iframe);
 
-      // Wait for iframe to be ready
-      iframe.onload = () => {
-        try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          
-          // Write the ad loading code directly into the iframe
-          iframeDoc.open();
-          iframeDoc.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { background: transparent; overflow: hidden; }
-              </style>
-            </head>
-            <body>
-              <script>
-                atOptions = {
-                  'key' : '${adKey}',
-                  'format' : 'iframe',
-                  'height' : ${height},
-                  'width' : ${width},
-                  'params' : {}
-                };
-              </` + `script>
-              <script src="https://www.highperformanceformat.com/${adKey}/invoke.js"></` + `script>
-            </body>
-            </html>
-          `);
-          iframeDoc.close();
-          setLoaded(true);
-        } catch (e) {
-          console.error('Failed to load ad:', adKey, e);
-          setError(true);
-        }
-      };
-
-      // For srcdoc approach (fallback)
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { background: transparent; overflow: hidden; }
-          </style>
-        </head>
-        <body>
-          <script>
-            atOptions = {
-              'key' : '${adKey}',
-              'format' : 'iframe',
-              'height' : ${height},
-              'width' : ${width},
-              'params' : {}
-            };
-          <\\/script>
-          <script src="https://www.highperformanceformat.com/${adKey}/invoke.js"><\\/script>
-        </body>
-        </html>
-      `;
-      
-      // Use srcdoc which is cleaner and works in most browsers
-      iframe.srcdoc = htmlContent.replace(/<\\\//g, '</');
+      // Single-load via srcdoc — no double-loading
+      iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:transparent;overflow:hidden}</style></head><body><script>atOptions={'key':'${adKey}','format':'iframe','height':${height},'width':${width},'params':{}};<\/script><script src="https://www.highperformanceformat.com/${adKey}/invoke.js"><\/script></body></html>`;
+      iframe.onload = () => setLoaded(true);
     };
 
-    // Stagger the ad loading based on loadDelay
-    const timer = setTimeout(loadAd, 300 + (loadDelay * 500));
-    
+    // Load immediately for first ads (loadDelay=0), tiny stagger for later ones
+    if (loadDelay === 0) {
+      loadAd();
+    } else {
+      const timer = setTimeout(loadAd, loadDelay * 100);
+      return () => clearTimeout(timer);
+    }
+
     return () => {
-      clearTimeout(timer);
       if (iframeRef.current && iframeRef.current.parentNode) {
         iframeRef.current.parentNode.removeChild(iframeRef.current);
       }
     };
   }, [adKey, width, height, loadDelay, isIOSDevice]);
 
-  // Don't render anything on iOS
   if (isIOSDevice) return null;
 
   return (
@@ -239,72 +169,58 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
     </div>
   );
 }
-
 // Adsterra Native Banner Component - for sponsored video section
 // DISABLED ON iOS to comply with App Store policies
 function AdsterraNativeBanner({ className = '' }) {
   const containerRef = useRef(null);
   const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [loaded, setLoaded] = useState(false);
-  const [key, setKey] = useState(0); // Force re-render key
+  const hasLoadedRef = useRef(false);
 
   // Synchronous iOS check
   const isIOSDevice = typeof window !== 'undefined' && isIOS();
 
   useEffect(() => {
-    // Don't load ads on iOS
     if (isIOSDevice) return;
     if (!containerRef.current) return;
+    if (hasLoadedRef.current) return; // Only load once per mount
+    hasLoadedRef.current = true;
 
-    const loadAd = () => {
-      // Always remove old scripts to ensure fresh load
-      const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-      existingScripts.forEach(s => s.remove());
-      
-      // Remove any existing container content from previous Adsterra injection
-      const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-      existingContainers.forEach(c => {
-        if (c !== containerRef.current) {
-          c.innerHTML = '';
-        }
-      });
+    // Remove old scripts from previous instances
+    const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+    existingScripts.forEach(s => s.remove());
+    
+    // Remove stale containers from previous renders
+    const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
+    existingContainers.forEach(c => {
+      if (c !== containerRef.current) c.innerHTML = '';
+    });
 
-      // Clear our container
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-
-      const script = document.createElement('script');
-      script.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
-      script.async = true;
-      script.setAttribute('data-cfasync', 'false');
-      script.setAttribute('data-instance', instanceId.current);
-      
-      script.onerror = () => {
-        console.warn('Native banner failed to load');
-        // Retry after 2 seconds
-        setTimeout(() => setKey(k => k + 1), 2000);
-      };
-      
-      script.onload = () => {
-        setLoaded(true);
-      };
-      
-      document.body.appendChild(script);
-    };
-
-    // Load immediately - no delay needed since container ref is ready
-    loadAd();
-  }, [key]);
-
-  // Re-trigger load when component mounts (e.g., returning from search)
-  useEffect(() => {
-    if (!isIOSDevice) {
-      setKey(k => k + 1);
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
     }
+
+    const script = document.createElement('script');
+    script.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
+    script.async = true;
+    script.setAttribute('data-cfasync', 'false');
+    script.setAttribute('data-instance', instanceId.current);
+    
+    script.onerror = () => {
+      console.warn('Native banner failed to load');
+      hasLoadedRef.current = false; // Allow retry
+    };
+    
+    script.onload = () => setLoaded(true);
+    
+    // Append immediately — no delays
+    document.body.appendChild(script);
+
+    return () => {
+      hasLoadedRef.current = false;
+    };
   }, [isIOSDevice]);
 
-  // Don't render anything on iOS
   if (isIOSDevice) return null;
 
   return (
