@@ -100,29 +100,65 @@ function GoogleAdUnit({ slot, className = '' }) {
 const isIOS = () => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   const userAgent = navigator.userAgent || navigator.vendor || window.opera || '';
-  // Check for iOS devices
   return /iPad|iPhone|iPod/.test(userAgent) || 
-    // Check for iPad on iOS 13+ which reports as Mac
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
-// Adsterra Iframe Banner Component - uses iframe isolation to prevent atOptions conflicts
-// DISABLED ON iOS to comply with App Store policies
-function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 }) {
-  const containerRef = useRef(null);
-  const [loaded, setLoaded] = useState(false);
-  const iframeRef = useRef(null);
+// Cache iOS check result at module level (doesn't change during session)
+let _isIOSCached = null;
+const getIsIOS = () => {
+  if (_isIOSCached === null) _isIOSCached = isIOS();
+  return _isIOSCached;
+};
 
-  // Synchronous iOS check — no extra render cycle needed
-  const isIOSDevice = typeof window !== 'undefined' && isIOS();
+// DNS prefetch + preconnect for Adsterra ad domains (runs once on first render)
+let _dnsPrefetched = false;
+function prefetchAdDomains() {
+  if (_dnsPrefetched || typeof document === 'undefined') return;
+  _dnsPrefetched = true;
+  const domains = [
+    'www.highperformanceformat.com',
+    'pl28574038.effectivegatecpm.com',
+    'www.profitabledisplaynetwork.com',
+    'www.highrevenuegate.com',
+  ];
+  domains.forEach(domain => {
+    // DNS prefetch
+    const dns = document.createElement('link');
+    dns.rel = 'dns-prefetch';
+    dns.href = `//${domain}`;
+    document.head.appendChild(dns);
+    // Preconnect (establishes TCP + TLS early)
+    const pc = document.createElement('link');
+    pc.rel = 'preconnect';
+    pc.href = `https://${domain}`;
+    pc.crossOrigin = 'anonymous';
+    document.head.appendChild(pc);
+  });
+}
+
+// Adsterra Iframe Banner Component - each ad isolated in its own iframe
+// Uses document.write for fastest loading (faster than srcdoc)
+function AdsterraBanner({ adKey, width, height, className = '' }) {
+  const containerRef = useRef(null);
+  const iframeRef = useRef(null);
+  const retryTimerRef = useRef(null);
+  const isIOSDevice = getIsIOS();
+
+  useEffect(() => {
+    // Prefetch domains on first ad mount
+    prefetchAdDomains();
+  }, []);
 
   useEffect(() => {
     if (isIOSDevice) return;
     if (!containerRef.current) return;
 
     const loadAd = () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+      // Clean up previous iframe if any
+      if (iframeRef.current && iframeRef.current.parentNode) {
+        iframeRef.current.parentNode.removeChild(iframeRef.current);
+        iframeRef.current = null;
       }
 
       const iframe = document.createElement('iframe');
@@ -136,27 +172,42 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
       iframe.setAttribute('allowtransparency', 'true');
       
       iframeRef.current = iframe;
+      if (!containerRef.current) return;
       containerRef.current.appendChild(iframe);
 
-      // Single-load via srcdoc — no double-loading
-      iframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:transparent;overflow:hidden}</style></head><body><script>atOptions={'key':'${adKey}','format':'iframe','height':${height},'width':${width},'params':{}};<\/script><script src="https://www.highperformanceformat.com/${adKey}/invoke.js"><\/script></body></html>`;
-      iframe.onload = () => setLoaded(true);
-    };
-
-    // Load immediately for first ads (loadDelay=0), tiny stagger for later ones
-    if (loadDelay === 0) {
-      loadAd();
-    } else {
-      const timer = setTimeout(loadAd, loadDelay * 100);
-      return () => clearTimeout(timer);
-    }
-
-    return () => {
-      if (iframeRef.current && iframeRef.current.parentNode) {
-        iframeRef.current.parentNode.removeChild(iframeRef.current);
+      // Use document.write immediately after appending — fastest method
+      // No srcdoc (which is async), no blob URLs, direct synchronous write
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(
+          '<!DOCTYPE html><html><head>' +
+          '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+          '<style>*{margin:0;padding:0;box-sizing:border-box}body{background:transparent;overflow:hidden}</style>' +
+          '</head><body>' +
+          '<script>atOptions={"key":"' + adKey + '","format":"iframe","height":' + height + ',"width":' + width + ',"params":{}};</' + 'script>' +
+          '<script src="https://www.highperformanceformat.com/' + adKey + '/invoke.js"></' + 'script>' +
+          '</body></html>'
+        );
+        doc.close();
+      } catch (e) {
+        console.warn('Ad iframe write failed for', adKey, '- retrying');
+        // Retry once after 2 seconds
+        retryTimerRef.current = setTimeout(() => loadAd(), 2000);
       }
     };
-  }, [adKey, width, height, loadDelay, isIOSDevice]);
+
+    // Load immediately — no delays
+    loadAd();
+
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (iframeRef.current && iframeRef.current.parentNode) {
+        iframeRef.current.parentNode.removeChild(iframeRef.current);
+        iframeRef.current = null;
+      }
+    };
+  }, [adKey, width, height, isIOSDevice]);
 
   if (isIOSDevice) return null;
 
@@ -169,6 +220,7 @@ function AdsterraBanner({ adKey, width, height, className = '', loadDelay = 0 })
     </div>
   );
 }
+
 // Adsterra Native Banner Component - for sponsored video section
 // DISABLED ON iOS to comply with App Store policies
 function AdsterraNativeBanner({ className = '' }) {
@@ -176,29 +228,29 @@ function AdsterraNativeBanner({ className = '' }) {
   const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [loaded, setLoaded] = useState(false);
   const hasLoadedRef = useRef(false);
+  const retryTimerRef = useRef(null);
+  const isIOSDevice = getIsIOS();
 
-  // Synchronous iOS check
-  const isIOSDevice = typeof window !== 'undefined' && isIOS();
+  useEffect(() => {
+    prefetchAdDomains();
+  }, []);
 
   useEffect(() => {
     if (isIOSDevice) return;
     if (!containerRef.current) return;
-    if (hasLoadedRef.current) return; // Only load once per mount
+    if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
 
     // Remove old scripts from previous instances
     const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
     existingScripts.forEach(s => s.remove());
     
-    // Remove stale containers from previous renders
     const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
     existingContainers.forEach(c => {
       if (c !== containerRef.current) c.innerHTML = '';
     });
 
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-    }
+    if (containerRef.current) containerRef.current.innerHTML = '';
 
     const script = document.createElement('script');
     script.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
@@ -207,17 +259,27 @@ function AdsterraNativeBanner({ className = '' }) {
     script.setAttribute('data-instance', instanceId.current);
     
     script.onerror = () => {
-      console.warn('Native banner failed to load');
-      hasLoadedRef.current = false; // Allow retry
+      console.warn('Native banner failed, retrying in 3s...');
+      hasLoadedRef.current = false;
+      retryTimerRef.current = setTimeout(() => {
+        if (containerRef.current) {
+          hasLoadedRef.current = false;
+          // Force re-run by creating new script
+          const retryScript = document.createElement('script');
+          retryScript.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
+          retryScript.async = true;
+          retryScript.onload = () => setLoaded(true);
+          document.body.appendChild(retryScript);
+        }
+      }, 3000);
     };
     
     script.onload = () => setLoaded(true);
-    
-    // Append immediately — no delays
     document.body.appendChild(script);
 
     return () => {
       hasLoadedRef.current = false;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
   }, [isIOSDevice]);
 
@@ -250,7 +312,6 @@ const ADSTERRA_ADS = {
     { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },
   ],
 };
-
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -1276,7 +1337,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.searchFirstVideo.key}
                         width={ADSTERRA_ADS.searchFirstVideo.width}
                         height={ADSTERRA_ADS.searchFirstVideo.height}
-                        loadDelay={0}
                       />
                     )}
                     {/* Show search ads after every 3 videos (total 2 ads) */}
@@ -1285,7 +1345,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].height}
-                        loadDelay={Math.floor((index + 1) / 3)}
                       />
                     )}
                   </React.Fragment>
@@ -1312,7 +1371,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                         adKey={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].height}
-                        loadDelay={Math.floor((index + 1) / 3) - 1}
                       />
                     )}
                   </React.Fragment>
