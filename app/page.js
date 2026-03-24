@@ -48,7 +48,7 @@ const LOGO_URL = '/logo.png';
 // SPONSORED VIDEO EARN TEXT - Change this for each sponsored video
 // Example: 'Earn 20 $VIDEO' for a 4-minute video
 // ============================================
-const SPONSORED_VIDEO_EARN_TEXT = 'Earn 30 $VIDEO';
+const SPONSORED_VIDEO_EARN_TEXT = 'Earn 25 $VIDEO';
 
 // ============================================
 // GOOGLE ADSENSE CONFIGURATION
