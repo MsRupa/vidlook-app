@@ -1875,7 +1875,7 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
       return;
     }
 
-    // COMING SOON - Conversion temporarily disabled until April 2026
+    // COMING SOON - Conversion temporarily disabled until June 2026
     setSuccess(txt.comingSoon);
     return;
 
