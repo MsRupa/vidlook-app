@@ -13,11 +13,11 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { translations, LANGUAGES, getLanguageFromCountry, t } from '@/lib/translations';
-import { 
-  Home, 
-  User, 
-  ArrowRightLeft, 
-  Search, 
+import {
+  Home,
+  User,
+  ArrowRightLeft,
+  Search,
   Wallet,
   Play,
   Clock,
@@ -66,7 +66,7 @@ function GoogleAdUnit({ slot, className = '' }) {
   useEffect(() => {
     // Only load ad once and if adsbygoogle is available
     if (adLoaded || !adRef.current) return;
-    
+
     try {
       if (typeof window !== 'undefined' && window.adsbygoogle) {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -100,7 +100,7 @@ function GoogleAdUnit({ slot, className = '' }) {
 const isIOS = () => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   const userAgent = navigator.userAgent || navigator.vendor || window.opera || '';
-  return /iPad|iPhone|iPod/.test(userAgent) || 
+  return /iPad|iPhone|iPod/.test(userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 };
 
@@ -170,7 +170,7 @@ function AdsterraBanner({ adKey, width, height, className = '' }) {
       iframe.scrolling = 'no';
       iframe.setAttribute('frameborder', '0');
       iframe.setAttribute('allowtransparency', 'true');
-      
+
       iframeRef.current = iframe;
       if (!containerRef.current) return;
       containerRef.current.appendChild(iframe);
@@ -213,7 +213,7 @@ function AdsterraBanner({ adKey, width, height, className = '' }) {
 
   return (
     <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
-      <div 
+      <div
         ref={containerRef}
         style={{ minHeight: height, maxWidth: '100%' }}
       ></div>
@@ -244,7 +244,7 @@ function AdsterraNativeBanner({ className = '' }) {
     // Remove old scripts from previous instances
     const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
     existingScripts.forEach(s => s.remove());
-    
+
     const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
     existingContainers.forEach(c => {
       if (c !== containerRef.current) c.innerHTML = '';
@@ -257,7 +257,7 @@ function AdsterraNativeBanner({ className = '' }) {
     script.async = true;
     script.setAttribute('data-cfasync', 'false');
     script.setAttribute('data-instance', instanceId.current);
-    
+
     script.onerror = () => {
       console.warn('Native banner failed, retrying in 3s...');
       hasLoadedRef.current = false;
@@ -273,7 +273,7 @@ function AdsterraNativeBanner({ className = '' }) {
         }
       }, 3000);
     };
-    
+
     script.onload = () => setLoaded(true);
     document.body.appendChild(script);
 
@@ -287,8 +287,8 @@ function AdsterraNativeBanner({ className = '' }) {
 
   return (
     <div className={`ad-container my-4 flex justify-center ${className}`}>
-      <div 
-        id="container-cae4f95eed4d1e4f9d144c0e18d8b6da" 
+      <div
+        id="container-cae4f95eed4d1e4f9d144c0e18d8b6da"
         ref={containerRef}
         data-instance={instanceId.current}
       ></div>
@@ -367,12 +367,12 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   const wrapperRef = useRef(null);
   const accumulatedTimeRef = useRef(0);
   const lastTickRef = useRef(null);
-  
+
   // Store callbacks in refs to avoid re-creating the player when callbacks change
   const onTimeUpdateRef = useRef(onTimeUpdate);
   const onPlayRef = useRef(onPlay);
   const onPauseRef = useRef(onPause);
-  
+
   // Keep refs up to date
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate;
@@ -434,7 +434,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
   // Initialize player when API is ready
   useEffect(() => {
     if (!apiReady || !containerRef.current || playerRef.current) return;
-    
+
     // Don't create player if videoId is invalid
     if (!videoId || typeof videoId !== 'string' || videoId.trim() === '') {
       console.warn('Invalid videoId, skipping player creation');
@@ -464,11 +464,11 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
           if (event.data === window.YT.PlayerState.PLAYING) {
             // Pause all other players before this one starts
             pauseOtherPlayers();
-            
+
             setIsPlaying(true);
             lastTickRef.current = Date.now();
             if (onPlayRef.current) onPlayRef.current();
-            
+
             // Start tracking time
             if (intervalRef.current) clearInterval(intervalRef.current);
             intervalRef.current = setInterval(() => {
@@ -480,11 +480,11 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
               setWatchTime(totalTime);
               if (onTimeUpdateRef.current) onTimeUpdateRef.current(totalTime);
             }, 1000);
-          } else if (event.data === window.YT.PlayerState.PAUSED || 
-                     event.data === window.YT.PlayerState.ENDED) {
+          } else if (event.data === window.YT.PlayerState.PAUSED ||
+            event.data === window.YT.PlayerState.ENDED) {
             setIsPlaying(false);
             if (onPauseRef.current) onPauseRef.current();
-            
+
             // Stop tracking time
             if (intervalRef.current) {
               clearInterval(intervalRef.current);
@@ -504,7 +504,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
     return () => {
       // Remove from registry
       playerRegistry.delete(videoId);
-      
+
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -594,7 +594,7 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
           if (screen.orientation && screen.orientation.unlock) {
             screen.orientation.unlock();
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     };
   }, [isFullscreen]);
@@ -654,12 +654,12 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
   const handleTimeUpdate = useCallback((time) => {
     setWatchTime(time);
     const currentMinute = Math.floor(time / 60);
-    
+
     // Send to server every minute - wait for confirmation before showing tokens
     if (currentMinute > lastRecordedMinuteRef.current && !pendingMinute) {
       lastRecordedMinuteRef.current = currentMinute;
       setPendingMinute(true);
-      
+
       // Report exactly 60 seconds per minute watched
       if (onWatch) {
         onWatch(videoId, 60, isSponsored).then((result) => {
@@ -694,8 +694,8 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
           <span>{SPONSORED_VIDEO_EARN_TEXT}</span>
         </div>
       )}
-      <YouTubePlayer 
-        videoId={videoId} 
+      <YouTubePlayer
+        videoId={videoId}
         onTimeUpdate={handleTimeUpdate}
         isSponsored={isSponsored}
       />
@@ -780,13 +780,13 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
           console.log('Language already saved, skipping auto-detection:', savedLanguage);
           return;
         }
-        
+
         const res = await fetch('https://api.country.is');
         const data = await res.json();
         if (data.country) {
           setDetectedCountry(data.country);
           console.log('Pre-detected country:', data.country);
-          
+
           // Auto-set language based on country (only if no saved preference)
           const detectedLang = getLanguageFromCountry(data.country);
           if (detectedLang !== 'en') {
@@ -807,7 +807,7 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
     }
 
     setIsConnecting(true);
-    
+
     try {
       // Use MiniKit wallet auth
       const { commandPayload, finalPayload } = await MiniKit.commandsAsync.walletAuth({
@@ -826,7 +826,7 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
       // Get wallet address from MiniKit user
       const walletAddress = MiniKit.user?.walletAddress;
       const username = MiniKit.user?.username;
-      
+
       if (walletAddress) {
         // Pass to parent with username if available
         onConnect(walletAddress, detectedCountry, username);
@@ -858,9 +858,9 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
           <div className="flex justify-center">
             <div className="relative">
               <div className="absolute inset-0 bg-red-500 blur-3xl opacity-30 rounded-full" />
-              <img 
-                src={LOGO_URL} 
-                alt="VidLook" 
+              <img
+                src={LOGO_URL}
+                alt="VidLook"
                 className="w-24 h-24 relative z-10 drop-shadow-2xl"
               />
             </div>
@@ -912,9 +912,8 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
                       onLanguageChange(lang.code);
                       setShowLanguageDropdown(false);
                     }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${
-                      language === lang.code ? 'bg-gray-700' : ''
-                    }`}
+                    className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${language === lang.code ? 'bg-gray-700' : ''
+                      }`}
                   >
                     <span className="text-xl">{lang.flag}</span>
                     <span className="text-white">{lang.name}</span>
@@ -938,9 +937,9 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
         <div className="flex justify-center">
           <div className="relative">
             <div className="absolute inset-0 bg-red-500 blur-3xl opacity-30 rounded-full" />
-            <img 
-              src={LOGO_URL} 
-              alt="VidLook" 
+            <img
+              src={LOGO_URL}
+              alt="VidLook"
               className="w-24 h-24 relative z-10 drop-shadow-2xl"
             />
           </div>
@@ -990,7 +989,7 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
         </div>
 
         {/* Connect Button */}
-        <Button 
+        <Button
           onClick={handleConnect}
           disabled={isConnecting}
           className="w-full h-14 text-lg font-bold bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-2xl shadow-lg shadow-red-500/25 transition-all transform hover:scale-[1.02]"
@@ -1029,9 +1028,8 @@ function WelcomeScreen({ onConnect, language, onLanguageChange }) {
                     onLanguageChange(lang.code);
                     setShowLanguageDropdown(false);
                   }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${
-                    language === lang.code ? 'bg-gray-700' : ''
-                  }`}
+                  className={`flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-700 transition ${language === lang.code ? 'bg-gray-700' : ''
+                    }`}
                 >
                   <span className="text-xl">{lang.flag}</span>
                   <span className="text-white">{lang.name}</span>
@@ -1068,19 +1066,19 @@ function HomeScreen({ user, onTokensEarned, language }) {
     // Prevent concurrent/duplicate loads
     if (loadingRef.current) return;
     loadingRef.current = true;
-    
+
     try {
       if (pageNum === 1) setIsLoading(true);
       else setLoadingMore(true);
-      
+
       const res = await fetch(`/api/videos/feed?region=${user?.country || 'US'}&page=${pageNum}&limit=10`);
-      
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
-      
+
       const data = await res.json();
-      
+
       // Check if we got valid data
       if (!data.videos || data.videos.length === 0) {
         setHasMore(false); // No more videos — stop trying
@@ -1089,7 +1087,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
         }
         return;
       }
-      
+
       if (pageNum === 1) {
         setVideos(data.videos);
       } else {
@@ -1099,7 +1097,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
       setPage(pageNum);
     } catch (error) {
       console.error('Failed to load videos:', error);
-      
+
       // Retry up to 2 times with exponential backoff
       if (retryCount < 2) {
         const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
@@ -1108,7 +1106,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
         setTimeout(() => loadVideos(pageNum, retryCount + 1), delay);
         return;
       }
-      
+
       // Show error only on first page load failure after retries
       if (pageNum === 1) {
         toast.error('Failed to load videos. Check your connection.', { duration: 4000 });
@@ -1162,27 +1160,27 @@ function HomeScreen({ user, onTokensEarned, language }) {
     setIsSearching(true);
     try {
       const res = await fetch(`/api/videos/search?q=${encodeURIComponent(searchQuery)}&region=${user?.country || 'US'}`);
-      
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
-      
+
       const data = await res.json();
-      
+
       // Handle API-level errors
       if (data.error === 'search_failed') {
         toast.error(data.message || 'Search temporarily unavailable', { duration: 4000 });
         setSearchResults([]);
         return;
       }
-      
+
       // Handle empty results
       if (!data.items || data.items.length === 0) {
         toast.info('No videos found for your search', { duration: 3000 });
         setSearchResults([]);
         return;
       }
-      
+
       setSearchResults(data.items);
     } catch (error) {
       console.error('Search failed:', error);
@@ -1211,12 +1209,12 @@ function HomeScreen({ user, onTokensEarned, language }) {
         })
       });
       const data = await res.json();
-      
+
       // Update total tokens in UI
       if (data.totalTokens !== undefined && onTokensEarned) {
         onTokensEarned(data.totalTokens);
       }
-      
+
       // Show message to user if there's one (rate limits, daily limits, etc.)
       if (data.message && data.tokensEarned === 0) {
         // Only show non-success messages
@@ -1224,7 +1222,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
           toast.info(data.message, { duration: 3000 });
         }
       }
-      
+
       return { tokensEarned: data.tokensEarned || 0, message: data.message };
     } catch (error) {
       console.error('Failed to record watch:', error);
@@ -1266,8 +1264,8 @@ function HomeScreen({ user, onTokensEarned, language }) {
               </button>
             )}
           </div>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isSearching}
             className="bg-red-500 hover:bg-red-600 rounded-xl"
           >
@@ -1326,14 +1324,14 @@ function HomeScreen({ user, onTokensEarned, language }) {
                 .filter(video => video.id?.videoId)
                 .map((video, index) => (
                   <React.Fragment key={video.id.videoId}>
-                    <VideoCard 
+                    <VideoCard
                       videoId={video.id.videoId}
                       title={video.snippet?.title}
                       onWatch={handleWatch}
                     />
                     {/* Banner 468x60 below search first video */}
                     {index === 0 && (
-                      <AdsterraBanner 
+                      <AdsterraBanner
                         adKey={ADSTERRA_ADS.searchFirstVideo.key}
                         width={ADSTERRA_ADS.searchFirstVideo.width}
                         height={ADSTERRA_ADS.searchFirstVideo.height}
@@ -1341,7 +1339,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                     )}
                     {/* Show search ads after every 3 videos (total 2 ads) */}
                     {index > 0 && (index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.searchAds.length && (
-                      <AdsterraBanner 
+                      <AdsterraBanner
                         adKey={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].height}
@@ -1355,7 +1353,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                 .filter(video => video.videoId)
                 .map((video, index) => (
                   <React.Fragment key={video.videoId + '-' + index}>
-                    <VideoCard 
+                    <VideoCard
                       videoId={video.videoId}
                       title={video.title}
                       isSponsored={video.isSponsored || false}
@@ -1365,9 +1363,26 @@ function HomeScreen({ user, onTokensEarned, language }) {
                     {index === 0 && video.isSponsored && (
                       <AdsterraNativeBanner />
                     )}
+                    {/* ORB Verification CTA - below sponsored video & ads */}
+                    {index === 0 && (
+                      <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-xl px-4 py-3 my-4">
+                        <div className="flex items-center gap-2 text-white text-sm font-medium">
+                          <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                          <span>Get ORB verified and 50 WLD free</span>
+                        </div>
+                        <a
+                          href="https://world.org/join/FNHGEKV"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-shrink-0 ml-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all duration-200"
+                        >
+                          Verify
+                        </a>
+                      </div>
+                    )}
                     {/* Show feed ads after every 3 videos (total 3 ads) */}
                     {(index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.feedAds.length && (
-                      <AdsterraBanner 
+                      <AdsterraBanner
                         adKey={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].key}
                         width={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].width}
                         height={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].height}
@@ -1457,29 +1472,29 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
       if (taskId === 'follow_x') {
         window.open('https://x.com/vidlookapp', '_blank');
       }
-      
+
       // For post_x task: open Twitter with pre-filled tweet
       if (taskId === 'post_x') {
         const tweetText = encodeURIComponent('I\'m earning $VIDEO tokens by watching YouTube videos on @vidlookapp! 🎬💰\n\nWatch & Earn in the World App! 🌍\n\n#VidLook #WorldApp #Web3 #Crypto');
         window.open(`https://x.com/intent/tweet?text=${tweetText}`, '_blank');
       }
-      
+
       const res = await fetch('/api/tasks/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, taskId })
       });
       const data = await res.json();
-      
+
       if (data.error) {
         // Show error message for specific cases
         console.log('Task error:', data.error);
         return;
       }
-      
+
       if (data.success) {
         // Update tasks
-        setTasks(prev => prev.map(t => 
+        setTasks(prev => prev.map(t =>
           t.id === taskId ? { ...t, completed: true, completedAt: new Date().toISOString() } : t
         ));
         if (onTokensEarned) {
@@ -1614,7 +1629,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
               </button>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={onLogout}
             variant="outline"
             className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 px-3 py-2 flex items-center gap-2"
@@ -1687,7 +1702,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
                   {task.completed ? (
                     <CheckCircle2 className="w-6 h-6 text-green-500" />
                   ) : (
-                    <Button 
+                    <Button
                       size="sm"
                       onClick={() => completeTask(task.id)}
                       disabled={completingTask === task.id}
@@ -1717,7 +1732,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
         <div className="space-y-3">
           {/* FAQ 1 */}
           <Card className="bg-gray-900 border-gray-800 overflow-hidden">
-            <button 
+            <button
               onClick={() => setExpandedFaq(expandedFaq === 1 ? null : 1)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
@@ -1736,7 +1751,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
 
           {/* FAQ 2 */}
           <Card className="bg-gray-900 border-gray-800 overflow-hidden">
-            <button 
+            <button
               onClick={() => setExpandedFaq(expandedFaq === 2 ? null : 2)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
@@ -1754,7 +1769,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
 
           {/* FAQ 3 */}
           <Card className="bg-gray-900 border-gray-800 overflow-hidden">
-            <button 
+            <button
               onClick={() => setExpandedFaq(expandedFaq === 3 ? null : 3)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
@@ -1772,7 +1787,7 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
 
           {/* FAQ 4 - Transparency */}
           <Card className="bg-gray-900 border-gray-800 overflow-hidden">
-            <button 
+            <button
               onClick={() => setExpandedFaq(expandedFaq === 4 ? null : 4)}
               className="w-full p-4 flex items-center justify-between text-left"
             >
@@ -1861,15 +1876,15 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
 
   const handleConvert = async () => {
     const videoTokens = parseInt(amount);
-    
+
     setError('');
     setSuccess('');
-    
+
     if (!videoTokens || videoTokens < 5000) {
       setError('Minimum conversion is 5000 $VIDEO tokens');
       return;
     }
-    
+
     if (videoTokens > (user?.totalTokens || 0)) {
       setError('Insufficient $VIDEO tokens');
       return;
@@ -2050,9 +2065,9 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
                   <div>
                     <p className="text-white font-medium">{conv.videoTokens?.toLocaleString()} $VIDEO</p>
                     <p className="text-gray-500 text-xs">
-                      {new Date(conv.timestamp).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'short', 
+                      {new Date(conv.timestamp).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
@@ -2075,7 +2090,7 @@ function ConvertScreen({ user, onTokensUpdate, language }) {
 // Bottom Navigation
 function BottomNav({ activeTab, onTabChange, language }) {
   const txt = translations[language]?.nav || translations['en'].nav;
-  
+
   const tabs = [
     { id: 'home', icon: Home, label: txt.home },
     { id: 'convert', icon: ArrowRightLeft, label: txt.convert },
@@ -2093,16 +2108,15 @@ function BottomNav({ activeTab, onTabChange, language }) {
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          
+
           return (
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all ${
-                isActive 
-                  ? 'bg-red-500/20 text-red-500' 
+              className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all ${isActive
+                  ? 'bg-red-500/20 text-red-500'
                   : 'text-gray-500 hover:text-gray-300'
-              }`}
+                }`}
             >
               <Icon className={`w-6 h-6 ${isActive ? 'scale-110' : ''} transition-transform`} />
               <span className="text-xs mt-1 font-medium">{tab.label}</span>
@@ -2139,10 +2153,10 @@ export default function App() {
         if (savedLanguage && ['en', 'es', 'th', 'ja'].includes(savedLanguage)) {
           setLanguage(savedLanguage);
         }
-        
+
         // Check localStorage for saved wallet address
         const savedWalletAddress = localStorage.getItem('vidlook_wallet_address');
-        
+
         if (savedWalletAddress) {
           // Try to get existing user from API
           const res = await fetch(`/api/users/${savedWalletAddress}`);
@@ -2169,7 +2183,7 @@ export default function App() {
       setIsLoading(false);
       setIsInitialized(true);
     };
-    
+
     checkExistingSession();
   }, []);
 
@@ -2200,12 +2214,12 @@ export default function App() {
       });
 
       const userData = await res.json();
-      
+
       // Save wallet address to localStorage for session persistence
       if (userData && userData.id) {
         localStorage.setItem('vidlook_wallet_address', walletAddress);
       }
-      
+
       setUser(userData);
     } catch (error) {
       console.error('Connection failed:', error);
@@ -2231,8 +2245,8 @@ export default function App() {
   // Not connected - show welcome
   if (!user) {
     return (
-      <WelcomeScreen 
-        onConnect={handleConnect} 
+      <WelcomeScreen
+        onConnect={handleConnect}
         language={language}
         onLanguageChange={handleLanguageChange}
       />
@@ -2242,23 +2256,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-white">
       {activeTab === 'home' && (
-        <HomeScreen 
-          user={user} 
+        <HomeScreen
+          user={user}
           onTokensEarned={handleTokensUpdate}
           language={language}
         />
       )}
-      
+
       {activeTab === 'convert' && (
-        <ConvertScreen 
+        <ConvertScreen
           user={user}
           onTokensUpdate={handleTokensUpdate}
           language={language}
         />
       )}
-      
+
       {activeTab === 'profile' && (
-        <ProfileScreen 
+        <ProfileScreen
           user={user}
           onTokensEarned={handleTokensUpdate}
           onLogout={() => {
@@ -2269,8 +2283,8 @@ export default function App() {
         />
       )}
 
-      <BottomNav 
-        activeTab={activeTab} 
+      <BottomNav
+        activeTab={activeTab}
         onTabChange={setActiveTab}
         language={language}
       />
