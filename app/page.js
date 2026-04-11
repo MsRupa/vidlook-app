@@ -1368,7 +1368,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-xl px-4 py-3 my-4">
                         <div className="flex items-center gap-2 text-white text-sm font-medium">
                           <Globe className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                          <span>Get ORB verified and 50 WLD free</span>
+                          <span>Get verified and 50 WLD free</span>
                         </div>
                         <a
                           href="https://world.org/join/FNHGEKV"
@@ -2114,8 +2114,8 @@ function BottomNav({ activeTab, onTabChange, language }) {
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={`flex flex-col items-center py-2 px-4 rounded-xl transition-all ${isActive
-                  ? 'bg-red-500/20 text-red-500'
-                  : 'text-gray-500 hover:text-gray-300'
+                ? 'bg-red-500/20 text-red-500'
+                : 'text-gray-500 hover:text-gray-300'
                 }`}
             >
               <Icon className={`w-6 h-6 ${isActive ? 'scale-110' : ''} transition-transform`} />
