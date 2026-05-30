@@ -457,18 +457,35 @@ export async function POST(request, { params }) {
         }
       }
       
-      // 7. Per-video limit: Max 30 minutes (1800 seconds) per video per day
-      const MAX_SECONDS_PER_VIDEO_PER_DAY = 1800;
-      const today = now.toISOString().split('T')[0];
-      const { data: videoHistory } = await supabase
-        .from('watch_history')
-        .select('watched_seconds')
-        .eq('user_id', userId)
-        .eq('video_id', videoId)
-        .gte('created_at', today + 'T00:00:00.000Z')
-        .lt('created_at', today + 'T23:59:59.999Z');
+      // 7-9. OPTIMIZED: Single RPC call for all watch limits (replaces 3 separate queries)
+      const MAX_SECONDS_PER_VIDEO_PER_DAY = 1800;  // 30 min per video per day
+      const DAILY_LIMIT_SECONDS = 21600;             // 6 hours per day
+      const HOURLY_LIMIT_SECONDS = 4200;             // 70 min per hour
       
-      const videoTodaySeconds = (videoHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
+      const today = now.toISOString().split('T')[0];
+      const todayStart = today + 'T00:00:00.000Z';
+      const todayEnd = today + 'T23:59:59.999Z';
+      const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+      
+      const { data: limits, error: limitsError } = await supabase
+        .rpc('get_watch_limits', {
+          p_user_id: userId,
+          p_video_id: videoId,
+          p_today_start: todayStart,
+          p_today_end: todayEnd,
+          p_one_hour_ago: oneHourAgo
+        })
+        .single();
+      
+      if (limitsError) {
+        console.error('Watch limits RPC error:', limitsError);
+        return NextResponse.json({ error: 'Failed to check limits' }, { status: 500, headers: corsHeaders });
+      }
+      
+      const videoTodaySeconds = Number(limits?.video_today_seconds || 0);
+      const todayTotalSeconds = Number(limits?.today_total_seconds || 0);
+      const hourTotalSeconds = Number(limits?.hour_total_seconds || 0);
+      
       if (videoTodaySeconds >= MAX_SECONDS_PER_VIDEO_PER_DAY) {
         return NextResponse.json({ 
           tokensEarned: 0, 
@@ -477,16 +494,6 @@ export async function POST(request, { params }) {
         }, { headers: corsHeaders });
       }
       
-      // 8. Daily limit: Max 6 hours (21600 seconds) of credited watch time per day
-      const DAILY_LIMIT_SECONDS = 21600;
-      const { data: todayHistory } = await supabase
-        .from('watch_history')
-        .select('watched_seconds')
-        .eq('user_id', userId)
-        .gte('created_at', today + 'T00:00:00.000Z')
-        .lt('created_at', today + 'T23:59:59.999Z');
-      
-      const todayTotalSeconds = (todayHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
       if (todayTotalSeconds >= DAILY_LIMIT_SECONDS) {
         return NextResponse.json({ 
           tokensEarned: 0, 
@@ -495,16 +502,6 @@ export async function POST(request, { params }) {
         }, { headers: corsHeaders });
       }
       
-      // 9. Hourly limit: Max 70 minutes per hour (allows some buffer but prevents extreme abuse)
-      const HOURLY_LIMIT_SECONDS = 4200;
-      const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
-      const { data: hourHistory } = await supabase
-        .from('watch_history')
-        .select('watched_seconds')
-        .eq('user_id', userId)
-        .gte('created_at', oneHourAgo);
-      
-      const hourTotalSeconds = (hourHistory || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
       if (hourTotalSeconds >= HOURLY_LIMIT_SECONDS) {
         return NextResponse.json({ 
           tokensEarned: 0, 
