@@ -648,34 +648,37 @@ function YouTubePlayer({ videoId, onTimeUpdate, onPlay, onPause, isSponsored }) 
 function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
   const [watchTime, setWatchTime] = useState(0);
   const [sessionTokens, setSessionTokens] = useState(0);
-  const [pendingMinute, setPendingMinute] = useState(false);
-  const lastRecordedMinuteRef = useRef(0);
+  const [pendingRecord, setPendingRecord] = useState(false);
+  const lastRecordedIntervalRef = useRef(0);
+
+  // Report every 3 minutes (180s) to reduce Vercel function invocations
+  const REPORT_INTERVAL = 180; // seconds
 
   const handleTimeUpdate = useCallback((time) => {
     setWatchTime(time);
-    const currentMinute = Math.floor(time / 60);
+    const currentInterval = Math.floor(time / REPORT_INTERVAL);
 
-    // Send to server every minute - wait for confirmation before showing tokens
-    if (currentMinute > lastRecordedMinuteRef.current && !pendingMinute) {
-      lastRecordedMinuteRef.current = currentMinute;
-      setPendingMinute(true);
+    // Send to server every 3 minutes - wait for confirmation before showing tokens
+    if (currentInterval > lastRecordedIntervalRef.current && !pendingRecord) {
+      lastRecordedIntervalRef.current = currentInterval;
+      setPendingRecord(true);
 
-      // Report exactly 60 seconds per minute watched
+      // Report exactly 180 seconds per 3-minute interval watched
       if (onWatch) {
-        onWatch(videoId, 60, isSponsored).then((result) => {
-          setPendingMinute(false);
+        onWatch(videoId, REPORT_INTERVAL, isSponsored).then((result) => {
+          setPendingRecord(false);
           if (result && result.tokensEarned > 0) {
             // Only show tokens AFTER server confirms
             setSessionTokens(prev => prev + result.tokensEarned);
           }
         }).catch(() => {
-          setPendingMinute(false);
+          setPendingRecord(false);
         });
       } else {
-        setPendingMinute(false);
+        setPendingRecord(false);
       }
     }
-  }, [videoId, onWatch, isSponsored, pendingMinute]);
+  }, [videoId, onWatch, isSponsored, pendingRecord]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -708,7 +711,7 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
             <Clock className="w-4 h-4" />
             <span>{formatTime(watchTime)}</span>
           </div>
-          {pendingMinute ? (
+          {pendingRecord ? (
             <Badge className="bg-gray-600 text-gray-300 animate-pulse">
               Saving...
             </Badge>
@@ -716,9 +719,9 @@ function VideoCard({ videoId, onWatch, title, isSponsored = false }) {
             <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
               +{sessionTokens} $VIDEO
             </Badge>
-          ) : watchTime > 0 && watchTime < 60 ? (
+          ) : watchTime > 0 && watchTime < 180 ? (
             <span className="text-xs text-gray-500">
-              {60 - watchTime}s until first token
+              {180 - watchTime}s until first token
             </span>
           ) : null}
         </div>
@@ -1121,9 +1124,13 @@ function HomeScreen({ user, onTokensEarned, language }) {
   // Keep ref in sync so observer always calls latest loadVideos
   loadVideosRef.current = loadVideos;
 
-  // Load initial videos
+  // Load initial videos — only on first mount (not on tab switches)
+  const hasLoadedRef2 = useRef(false);
   useEffect(() => {
-    loadVideos();
+    if (!hasLoadedRef2.current) {
+      hasLoadedRef2.current = true;
+      loadVideos();
+    }
   }, [user?.country]);
 
   // Infinite scroll using callback ref — attaches observer when sentinel mounts
@@ -1443,21 +1450,18 @@ function ProfileScreen({ user, onTokensEarned, onLogout, language }) {
   const loadProfileData = async () => {
     try {
       setIsLoading(true);
-      const [statsRes, tasksRes, historyRes] = await Promise.all([
-        fetch(`/api/stats/${user.id}`),
-        fetch(`/api/tasks/${user.id}`),
-        fetch(`/api/history/${user.id}`)
-      ]);
+      // Single API call instead of 3 separate ones (saves 2 function invocations)
+      const res = await fetch(`/api/profile/${user.id}`);
+      const data = await res.json();
 
-      const [statsData, tasksData, historyData] = await Promise.all([
-        statsRes.json(),
-        tasksRes.json(),
-        historyRes.json()
-      ]);
+      if (data.error) {
+        console.error('Profile load error:', data.error);
+        return;
+      }
 
-      setStats(statsData);
-      setTasks(tasksData);
-      setHistory(historyData);
+      setStats(data.stats);
+      setTasks(data.tasks);
+      setHistory(data.history);
     } catch (error) {
       console.error('Failed to load profile:', error);
     } finally {
@@ -2144,7 +2148,7 @@ export default function App() {
     }
   }, []);
 
-  // Check for existing session on app load - uses localStorage for persistence
+  // Check for existing session on app load - uses localStorage cache to skip API calls
   useEffect(() => {
     const checkExistingSession = async () => {
       try {
@@ -2158,13 +2162,36 @@ export default function App() {
         const savedWalletAddress = localStorage.getItem('vidlook_wallet_address');
 
         if (savedWalletAddress) {
-          // Try to get existing user from API
+          // Try cached user data first (saves a function invocation on every app open)
+          const cachedUserStr = localStorage.getItem('vidlook_user_cache');
+          const cachedTimestamp = localStorage.getItem('vidlook_user_cache_ts');
+          const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+          if (cachedUserStr && cachedTimestamp && (Date.now() - parseInt(cachedTimestamp)) < CACHE_TTL) {
+            try {
+              const cachedUser = JSON.parse(cachedUserStr);
+              if (cachedUser && cachedUser.id) {
+                setUser(cachedUser);
+                if (!savedLanguage) {
+                  const userLang = getLanguageFromCountry(cachedUser.country);
+                  if (userLang !== 'en') setLanguage(userLang);
+                }
+                setIsLoading(false);
+                setIsInitialized(true);
+                return;
+              }
+            } catch (e) { /* invalid cache, fall through to API */ }
+          }
+
+          // Cache miss or expired — fetch from API
           const res = await fetch(`/api/users/${savedWalletAddress}`);
           if (res.ok) {
             const userData = await res.json();
             if (userData && userData.id) {
               setUser(userData);
-              // Only set language based on country if user hasn't manually selected one
+              // Cache user data for future app opens
+              localStorage.setItem('vidlook_user_cache', JSON.stringify(userData));
+              localStorage.setItem('vidlook_user_cache_ts', Date.now().toString());
               if (!savedLanguage) {
                 const userLang = getLanguageFromCountry(userData.country);
                 if (userLang !== 'en') setLanguage(userLang);
@@ -2174,8 +2201,10 @@ export default function App() {
               return;
             }
           }
-          // If user not found in DB, clear the saved address
+          // If user not found in DB, clear saved data
           localStorage.removeItem('vidlook_wallet_address');
+          localStorage.removeItem('vidlook_user_cache');
+          localStorage.removeItem('vidlook_user_cache_ts');
         }
       } catch (e) {
         console.log('Session restore failed:', e);
@@ -2215,9 +2244,11 @@ export default function App() {
 
       const userData = await res.json();
 
-      // Save wallet address to localStorage for session persistence
+      // Save wallet address and user cache to localStorage for session persistence
       if (userData && userData.id) {
         localStorage.setItem('vidlook_wallet_address', walletAddress);
+        localStorage.setItem('vidlook_user_cache', JSON.stringify(userData));
+        localStorage.setItem('vidlook_user_cache_ts', Date.now().toString());
       }
 
       setUser(userData);
@@ -2277,6 +2308,8 @@ export default function App() {
           onTokensEarned={handleTokensUpdate}
           onLogout={() => {
             localStorage.removeItem('vidlook_wallet_address');
+            localStorage.removeItem('vidlook_user_cache');
+            localStorage.removeItem('vidlook_user_cache_ts');
             setUser(null);
           }}
           language={language}
