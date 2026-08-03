@@ -93,41 +93,6 @@ function GoogleAdUnit({ slot, className = '' }) {
 }
 
 
-// ============================================
-// VIGNETTE AD COMPONENT
-// ============================================
-
-// Vignette Ad Component - injects the script into its container
-function VignetteAd({ zoneId, className = '' }) {
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    
-    // Clear previous if any
-    containerRef.current.innerHTML = '';
-    
-    const s = document.createElement('script');
-    s.dataset.zone = zoneId;
-    s.src = 'https://n6wxm.com/vignette.min.js';
-    
-    // Append to container
-    containerRef.current.appendChild(s);
-    
-    return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
-    };
-  }, [zoneId]);
-
-  return (
-    <div className={`ad-container my-4 flex justify-center w-full min-h-[60px] ${className}`}>
-      <div ref={containerRef} className="w-full flex justify-center items-center" />
-    </div>
-  );
-}
-
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -1152,14 +1117,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       title={video.snippet?.title}
                       onWatch={handleWatch}
                     />
-                    {/* Banner 1: below search first video */}
-                    {index === 0 && (
-                      <VignetteAd zoneId="10522368" />
-                    )}
-                    {/* Banner 2: Show search ads after every 3 videos */}
-                    {index > 0 && (index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= 2 && (
-                      <VignetteAd zoneId="10655497" />
-                    )}
                   </React.Fragment>
                 ))
             ) : (
@@ -1174,10 +1131,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       isSponsored={video.isSponsored || false}
                       onWatch={handleWatch}
                     />
-                    {/* Banner 5: Sponsored video native banner */}
-                    {index === 0 && video.isSponsored && (
-                      <VignetteAd zoneId="11494172" />
-                    )}
                     {/* ORB Verification CTA - below sponsored video */}
                     {index === 0 && (
                       <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-xl px-4 py-3 my-4">
@@ -1194,10 +1147,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                           Verify
                         </a>
                       </div>
-                    )}
-                    {/* Banner 3 & 4: Feed ads after every 3 videos */}
-                    {(index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= 2 && (
-                      <VignetteAd zoneId={Math.floor((index + 1) / 3) === 1 ? "10659821" : "10661272"} />
                     )}
                   </React.Fragment>
                 ))
