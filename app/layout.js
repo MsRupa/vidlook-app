@@ -30,6 +30,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark">
       <head>
+        {/* Monetag Push Notification Ads */}
+        <Script
+          src="https://5gvci.com/act/files/tag.min.js?z=11493370"
+          data-cfasync="false"
+          strategy="afterInteractive"
+        />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -69,6 +75,9 @@ export default function RootLayout({ children }) {
         <link rel="dns-prefetch" href="https://www.tsyndicate.com" />
         <link rel="dns-prefetch" href="https://www.adskeeper.co.uk" />
         <link rel="dns-prefetch" href="https://www.optiserve.net" />
+        {/* Monetag push notification ads */}
+        <link rel="preconnect" href="https://5gvci.com" />
+        <link rel="dns-prefetch" href="https://5gvci.com" />
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <MiniKitProvider>
