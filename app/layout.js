@@ -30,9 +30,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark">
       <head>
-        {/* Monetag Push Notification Ads */}
+        {/* Monetag Multitag (All-in-One) Ads */}
         <Script
-          src="https://5gvci.com/act/files/tag.min.js?z=11493370"
+          src="https://quge5.com/88/tag.min.js"
+          data-zone="266525"
           data-cfasync="false"
           strategy="afterInteractive"
         />
@@ -64,20 +65,11 @@ export default function RootLayout({ children }) {
           strategy="afterInteractive"
         />
         
-        {/* Preload Adsterra ad scripts for faster loading */}
-        <link rel="preconnect" href="https://pl28574038.effectivegatecpm.com" />
-        <link rel="preconnect" href="https://www.highperformanceformat.com" />
-        <link rel="preconnect" href="https://www.adsterratech.com" />
-        <link rel="preconnect" href="https://www.tsyndicate.com" />
-        <link rel="dns-prefetch" href="https://pl28574038.effectivegatecpm.com" />
-        <link rel="dns-prefetch" href="https://www.highperformanceformat.com" />
-        <link rel="dns-prefetch" href="https://www.adsterratech.com" />
-        <link rel="dns-prefetch" href="https://www.tsyndicate.com" />
-        <link rel="dns-prefetch" href="https://www.adskeeper.co.uk" />
-        <link rel="dns-prefetch" href="https://www.optiserve.net" />
-        {/* Monetag push notification ads */}
-        <link rel="preconnect" href="https://5gvci.com" />
-        <link rel="dns-prefetch" href="https://5gvci.com" />
+        {/* Monetag ad domains */}
+        <link rel="preconnect" href="https://quge5.com" />
+        <link rel="preconnect" href="https://3nbf4.com" />
+        <link rel="dns-prefetch" href="https://quge5.com" />
+        <link rel="dns-prefetch" href="https://3nbf4.com" />
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <MiniKitProvider>

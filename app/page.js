@@ -92,226 +92,7 @@ function GoogleAdUnit({ slot, className = '' }) {
   );
 }
 
-// ============================================
-// ADSTERRA AD COMPONENTS
-// ============================================
 
-// Detect iOS devices (iPhone, iPad, iPod) - ads disabled on iOS due to App Store policies
-const isIOS = () => {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  const userAgent = navigator.userAgent || navigator.vendor || window.opera || '';
-  return /iPad|iPhone|iPod/.test(userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-};
-
-// Cache iOS check result at module level (doesn't change during session)
-let _isIOSCached = null;
-const getIsIOS = () => {
-  if (_isIOSCached === null) _isIOSCached = isIOS();
-  return _isIOSCached;
-};
-
-// DNS prefetch + preconnect for Adsterra ad domains (runs once on first render)
-let _dnsPrefetched = false;
-function prefetchAdDomains() {
-  if (_dnsPrefetched || typeof document === 'undefined') return;
-  _dnsPrefetched = true;
-  const domains = [
-    'www.highperformanceformat.com',
-    'pl28574038.effectivegatecpm.com',
-    'www.profitabledisplaynetwork.com',
-    'www.highrevenuegate.com',
-  ];
-  domains.forEach(domain => {
-    // DNS prefetch
-    const dns = document.createElement('link');
-    dns.rel = 'dns-prefetch';
-    dns.href = `//${domain}`;
-    document.head.appendChild(dns);
-    // Preconnect (establishes TCP + TLS early)
-    const pc = document.createElement('link');
-    pc.rel = 'preconnect';
-    pc.href = `https://${domain}`;
-    pc.crossOrigin = 'anonymous';
-    document.head.appendChild(pc);
-  });
-}
-
-// Adsterra Iframe Banner Component - each ad isolated in its own iframe
-// Uses document.write for fastest loading (faster than srcdoc)
-function AdsterraBanner({ adKey, width, height, className = '' }) {
-  const containerRef = useRef(null);
-  const iframeRef = useRef(null);
-  const retryTimerRef = useRef(null);
-  const isIOSDevice = getIsIOS();
-
-  useEffect(() => {
-    // Prefetch domains on first ad mount
-    prefetchAdDomains();
-  }, []);
-
-  useEffect(() => {
-    if (isIOSDevice) return;
-    if (!containerRef.current) return;
-
-    const loadAd = () => {
-      // Clean up previous iframe if any
-      if (iframeRef.current && iframeRef.current.parentNode) {
-        iframeRef.current.parentNode.removeChild(iframeRef.current);
-        iframeRef.current = null;
-      }
-
-      const iframe = document.createElement('iframe');
-      iframe.style.width = `${width}px`;
-      iframe.style.height = `${height}px`;
-      iframe.style.maxWidth = '100%';
-      iframe.style.border = 'none';
-      iframe.style.overflow = 'hidden';
-      iframe.scrolling = 'no';
-      iframe.setAttribute('frameborder', '0');
-      iframe.setAttribute('allowtransparency', 'true');
-
-      iframeRef.current = iframe;
-      if (!containerRef.current) return;
-      containerRef.current.appendChild(iframe);
-
-      // Use document.write immediately after appending — fastest method
-      // No srcdoc (which is async), no blob URLs, direct synchronous write
-      try {
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(
-          '<!DOCTYPE html><html><head>' +
-          '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-          '<style>*{margin:0;padding:0;box-sizing:border-box}body{background:transparent;overflow:hidden}</style>' +
-          '</head><body>' +
-          '<script>atOptions={"key":"' + adKey + '","format":"iframe","height":' + height + ',"width":' + width + ',"params":{}};</' + 'script>' +
-          '<script src="https://www.highperformanceformat.com/' + adKey + '/invoke.js"></' + 'script>' +
-          '</body></html>'
-        );
-        doc.close();
-      } catch (e) {
-        console.warn('Ad iframe write failed for', adKey, '- retrying');
-        // Retry once after 2 seconds
-        retryTimerRef.current = setTimeout(() => loadAd(), 2000);
-      }
-    };
-
-    // Load immediately — no delays
-    loadAd();
-
-    return () => {
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      if (iframeRef.current && iframeRef.current.parentNode) {
-        iframeRef.current.parentNode.removeChild(iframeRef.current);
-        iframeRef.current = null;
-      }
-    };
-  }, [adKey, width, height, isIOSDevice]);
-
-  if (isIOSDevice) return null;
-
-  return (
-    <div className={`ad-container my-4 flex justify-center overflow-hidden ${className}`}>
-      <div
-        ref={containerRef}
-        style={{ minHeight: height, maxWidth: '100%' }}
-      ></div>
-    </div>
-  );
-}
-
-// Adsterra Native Banner Component - for sponsored video section
-// DISABLED ON iOS to comply with App Store policies
-function AdsterraNativeBanner({ className = '' }) {
-  const containerRef = useRef(null);
-  const instanceId = useRef(`native-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
-  const [loaded, setLoaded] = useState(false);
-  const hasLoadedRef = useRef(false);
-  const retryTimerRef = useRef(null);
-  const isIOSDevice = getIsIOS();
-
-  useEffect(() => {
-    prefetchAdDomains();
-  }, []);
-
-  useEffect(() => {
-    if (isIOSDevice) return;
-    if (!containerRef.current) return;
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-
-    // Remove old scripts from previous instances
-    const existingScripts = document.querySelectorAll('script[src*="cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-    existingScripts.forEach(s => s.remove());
-
-    const existingContainers = document.querySelectorAll('[id^="container-cae4f95eed4d1e4f9d144c0e18d8b6da"]');
-    existingContainers.forEach(c => {
-      if (c !== containerRef.current) c.innerHTML = '';
-    });
-
-    if (containerRef.current) containerRef.current.innerHTML = '';
-
-    const script = document.createElement('script');
-    script.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
-    script.async = true;
-    script.setAttribute('data-cfasync', 'false');
-    script.setAttribute('data-instance', instanceId.current);
-
-    script.onerror = () => {
-      console.warn('Native banner failed, retrying in 3s...');
-      hasLoadedRef.current = false;
-      retryTimerRef.current = setTimeout(() => {
-        if (containerRef.current) {
-          hasLoadedRef.current = false;
-          // Force re-run by creating new script
-          const retryScript = document.createElement('script');
-          retryScript.src = `https://pl28574038.effectivegatecpm.com/cae4f95eed4d1e4f9d144c0e18d8b6da/invoke.js?t=${Date.now()}`;
-          retryScript.async = true;
-          retryScript.onload = () => setLoaded(true);
-          document.body.appendChild(retryScript);
-        }
-      }, 3000);
-    };
-
-    script.onload = () => setLoaded(true);
-    document.body.appendChild(script);
-
-    return () => {
-      hasLoadedRef.current = false;
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    };
-  }, [isIOSDevice]);
-
-  if (isIOSDevice) return null;
-
-  return (
-    <div className={`ad-container my-4 flex justify-center ${className}`}>
-      <div
-        id="container-cae4f95eed4d1e4f9d144c0e18d8b6da"
-        ref={containerRef}
-        data-instance={instanceId.current}
-      ></div>
-    </div>
-  );
-}
-
-// Adsterra Ad Keys Configuration
-const ADSTERRA_ADS = {
-  // Below search first video: 468x60
-  searchFirstVideo: { key: 'eb078d99fd9e73467084b64849ed2c56', width: 468, height: 60 },
-  // Feed ads (rotate these after every 3 videos)
-  feedAds: [
-    { key: 'c69d985ff1c9f30a2fffc0949cb3448a', width: 160, height: 300 },
-    { key: '4b93b1a293b06b300ae9666221ef96db', width: 728, height: 90 },
-    { key: '1978fdba198639aeec7244e408dbd4a8', width: 160, height: 600 },
-  ],
-  // Search ads (rotate these after every 3 videos)
-  searchAds: [
-    { key: 'd0b3a57d787c66a60c224207d0cb7bf5', width: 300, height: 250 },
-    { key: '05e918b3dd9acec44d85b42ef3b2063d', width: 320, height: 50 },
-  ],
-};
 // Country code to name mapping
 const COUNTRY_NAMES = {
   'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
@@ -1326,7 +1107,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
         ) : (
           <>
             {searchResults.length > 0 ? (
-              // Search Results with Adsterra ads
+              // Search Results
               searchResults
                 .filter(video => video.id?.videoId)
                 .map((video, index) => (
@@ -1336,26 +1117,10 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       title={video.snippet?.title}
                       onWatch={handleWatch}
                     />
-                    {/* Banner 468x60 below search first video */}
-                    {index === 0 && (
-                      <AdsterraBanner
-                        adKey={ADSTERRA_ADS.searchFirstVideo.key}
-                        width={ADSTERRA_ADS.searchFirstVideo.width}
-                        height={ADSTERRA_ADS.searchFirstVideo.height}
-                      />
-                    )}
-                    {/* Show search ads after every 3 videos (total 2 ads) */}
-                    {index > 0 && (index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.searchAds.length && (
-                      <AdsterraBanner
-                        adKey={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].key}
-                        width={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].width}
-                        height={ADSTERRA_ADS.searchAds[Math.floor((index + 1) / 3) - 1].height}
-                      />
-                    )}
                   </React.Fragment>
                 ))
             ) : (
-              // Feed Videos (Trending + Sponsored) with Adsterra ads
+              // Feed Videos (Trending + Sponsored)
               displayVideos
                 .filter(video => video.videoId)
                 .map((video, index) => (
@@ -1366,11 +1131,7 @@ function HomeScreen({ user, onTokensEarned, language }) {
                       isSponsored={video.isSponsored || false}
                       onWatch={handleWatch}
                     />
-                    {/* Native banner below sponsored video (first video) */}
-                    {index === 0 && video.isSponsored && (
-                      <AdsterraNativeBanner />
-                    )}
-                    {/* ORB Verification CTA - below sponsored video & ads */}
+                    {/* ORB Verification CTA - below sponsored video */}
                     {index === 0 && (
                       <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 rounded-xl px-4 py-3 my-4">
                         <div className="flex items-center gap-2 text-white text-sm font-medium">
@@ -1386,14 +1147,6 @@ function HomeScreen({ user, onTokensEarned, language }) {
                           Verify
                         </a>
                       </div>
-                    )}
-                    {/* Show feed ads after every 3 videos (total 3 ads) */}
-                    {(index + 1) % 3 === 0 && Math.floor((index + 1) / 3) <= ADSTERRA_ADS.feedAds.length && (
-                      <AdsterraBanner
-                        adKey={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].key}
-                        width={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].width}
-                        height={ADSTERRA_ADS.feedAds[Math.floor((index + 1) / 3) - 1].height}
-                      />
                     )}
                   </React.Fragment>
                 ))

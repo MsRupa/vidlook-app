@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 // EDGE MIDDLEWARE - Bot Protection & Rate Limiting
 // Runs at Vercel's edge BEFORE function invocations
 // Designed to protect against abuse WITHOUT breaking
-// the World App mini-app experience or Adsterra ads.
+// the World App mini-app experience or Monetag ads.
 // ============================================
 
 // Allowed origins - only your domain can call the API
@@ -215,7 +215,7 @@ export function middleware(request) {
 // Only run middleware on these paths — does NOT affect:
 // - Static assets (_next/static/*)
 // - Images (_next/image/*)  
-// - Adsterra ad scripts (loaded from external domains)
+// - Monetag ad scripts (loaded from external domains)
 // - YouTube IFrame API (loaded from youtube.com)
 // - External API calls (api.country.is, etc.)
 export const config = {
