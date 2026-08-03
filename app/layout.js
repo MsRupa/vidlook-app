@@ -30,42 +30,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark">
       <head>
-        {/* Monetag Multitag (All-in-One) Ads - beforeInteractive ensures it's in the initial HTML for Monetag's installation checker */}
-        <Script
-          src="https://quge5.com/88/tag.min.js"
-          data-zone="266525"
-          data-cfasync="false"
-          strategy="beforeInteractive"
-        />
-        
-        {/* Intercept intent:// URLs that Monetag popunder ads try to open — World App WebView cannot handle Android intents */}
-        <Script id="intent-interceptor" strategy="beforeInteractive">
-          {`
-            (function() {
-              // Block intent:// navigations that fail in WebViews
-              document.addEventListener('click', function(e) {
-                var target = e.target;
-                while (target && target !== document) {
-                  if (target.tagName === 'A' && target.href && target.href.indexOf('intent://') === 0) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                  }
-                  target = target.parentElement;
-                }
-              }, true);
-              // Override window.open to block intent:// URLs
-              var _origOpen = window.open;
-              window.open = function(url) {
-                if (url && typeof url === 'string' && url.indexOf('intent://') === 0) {
-                  return null;
-                }
-                return _origOpen.apply(this, arguments);
-              };
-            })();
-          `}
-        </Script>
-        
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -94,11 +58,9 @@ export default function RootLayout({ children }) {
           strategy="afterInteractive"
         />
         
-        {/* Monetag ad domains */}
-        <link rel="preconnect" href="https://quge5.com" />
-        <link rel="preconnect" href="https://3nbf4.com" />
-        <link rel="dns-prefetch" href="https://quge5.com" />
-        <link rel="dns-prefetch" href="https://3nbf4.com" />
+        {/* Vignette ad domains */}
+        <link rel="preconnect" href="https://n6wxm.com" />
+        <link rel="dns-prefetch" href="https://n6wxm.com" />
       </head>
       <body className="bg-black text-white antialiased overflow-x-hidden">
         <MiniKitProvider>
