@@ -274,24 +274,22 @@ export async function GET(request, { params }) {
       }), { headers: corsHeaders });
     }
     
-    // Get user stats
+    // Get user stats — uses pre-aggregated data from users table (no watch_history scan)
     if (path.startsWith('/stats/')) {
       const userId = pathSegments[1];
       
-      // Get total watch time and tokens earned
-      const { data: watchStats, error: watchError } = await supabase
-        .from('watch_history')
-        .select('watched_seconds, tokens_earned')
-        .eq('user_id', userId);
+      // Read pre-aggregated stats from users table (updated on every watch/record)
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('total_tokens, total_watched_seconds')
+        .eq('id', userId)
+        .single();
       
-      if (watchError) {
-        return NextResponse.json({ error: watchError.message }, { status: 500, headers: corsHeaders });
+      if (userError) {
+        return NextResponse.json({ error: userError.message }, { status: 500, headers: corsHeaders });
       }
       
-      const totalWatchTimeSeconds = (watchStats || []).reduce((sum, h) => sum + (h.watched_seconds || 0), 0);
-      const totalTokensEarned = (watchStats || []).reduce((sum, h) => sum + (h.tokens_earned || 0), 0);
-      
-      // Get conversion stats
+      // Get conversion stats (small table, fast query)
       const { data: conversionStats, error: convError } = await supabase
         .from('conversions')
         .select('video_tokens, wld_amount')
@@ -305,11 +303,67 @@ export async function GET(request, { params }) {
       const totalWldEarned = (conversionStats || []).reduce((sum, c) => sum + parseFloat(c.wld_amount || 0), 0);
       
       return NextResponse.json({
-        totalWatchTimeSeconds,
-        totalTokensEarned,
+        totalWatchTimeSeconds: user?.total_watched_seconds || 0,
+        totalTokensEarned: user?.total_tokens || 0,
         totalVideoTokensConverted,
         totalWldEarned
       }, { headers: corsHeaders });
+    }
+    
+    // Combined profile endpoint — returns stats + tasks + history in one call
+    if (path.startsWith('/profile/')) {
+      const userId = pathSegments[1];
+      
+      // Run all 3 queries in parallel
+      const [userRes, tasksRes, historyRes, conversionsRes] = await Promise.all([
+        supabase.from('users').select('total_tokens, total_watched_seconds').eq('id', userId).single(),
+        supabase.from('tasks').select('*').eq('user_id', userId),
+        supabase.from('watch_history').select('*').eq('user_id', userId).order('timestamp', { ascending: false }).limit(50),
+        supabase.from('conversions').select('video_tokens, wld_amount').eq('user_id', userId)
+      ]);
+      
+      if (userRes.error) {
+        return NextResponse.json({ error: userRes.error.message }, { status: 500, headers: corsHeaders });
+      }
+      
+      // Build stats from users table (pre-aggregated)
+      const totalVideoTokensConverted = (conversionsRes.data || []).reduce((sum, c) => sum + (c.video_tokens || 0), 0);
+      const totalWldEarned = (conversionsRes.data || []).reduce((sum, c) => sum + parseFloat(c.wld_amount || 0), 0);
+      
+      const stats = {
+        totalWatchTimeSeconds: userRes.data?.total_watched_seconds || 0,
+        totalTokensEarned: userRes.data?.total_tokens || 0,
+        totalVideoTokensConverted,
+        totalWldEarned
+      };
+      
+      // Build tasks
+      const allTasks = [
+        { id: 'daily_login', name: 'Daily Login Bonus', reward: 50, icon: '📅', daily: true },
+        { id: 'post_x', name: 'Post about VidLook on X', reward: 100, icon: '𝕏' },
+        { id: 'follow_x', name: 'Follow VidLook on X', reward: 100, icon: '𝕏' },
+        { id: 'watch_60', name: 'Watch 1 Hour Total', reward: 100, icon: '⏰' }
+      ];
+      
+      const today = new Date().toDateString();
+      const completedTasks = tasksRes.data || [];
+      
+      const tasks = allTasks.map(task => {
+        const completedTask = completedTasks.find(t => t.task_id === task.id);
+        if (task.id === 'daily_login' && completedTask) {
+          const lastClaim = new Date(completedTask.completed_at).toDateString();
+          return { ...task, completed: lastClaim === today, completedAt: completedTask.completed_at };
+        }
+        return { ...task, completed: !!completedTask, completedAt: completedTask?.completed_at };
+      });
+      
+      // Build history
+      const history = (historyRes.data || []).map(h => ({
+        id: h.id, userId: h.user_id, videoId: h.video_id,
+        watchedSeconds: h.watched_seconds, tokensEarned: h.tokens_earned, timestamp: h.timestamp
+      }));
+      
+      return NextResponse.json({ stats, tasks, history }, { headers: corsHeaders });
     }
     
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: corsHeaders });
@@ -403,8 +457,8 @@ export async function POST(request, { params }) {
         return NextResponse.json({ error: 'Invalid user' }, { status: 400, headers: corsHeaders });
       }
       
-      // 2. Limit max watchedSeconds per request (max 65 seconds - slightly over 1 minute for network latency)
-      const MAX_SECONDS_PER_REQUEST = 65;
+      // 2. Limit max watchedSeconds per request (max 195 seconds - 3 minutes + 15s buffer for network latency)
+      const MAX_SECONDS_PER_REQUEST = 195;
       const validatedSeconds = Math.min(Math.max(0, Math.floor(watchedSeconds)), MAX_SECONDS_PER_REQUEST);
       
       // 3. Get user with last_watch_recorded to check rate limiting
@@ -431,8 +485,8 @@ export async function POST(request, { params }) {
         }, { headers: corsHeaders });
       }
       
-      // 5. Rate limiting: Minimum 50 seconds between API calls (allows for network latency)
-      const MIN_INTERVAL_SECONDS = 50;
+      // 5. Rate limiting: Minimum 160 seconds between API calls (3-min intervals with latency buffer)
+      const MIN_INTERVAL_SECONDS = 160;
       if (user.last_watch_recorded) {
         const lastRecord = new Date(user.last_watch_recorded);
         const elapsedSeconds = (now - lastRecord) / 1000;
