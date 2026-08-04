@@ -228,10 +228,13 @@ export function middleware(request) {
       to { opacity: 1; transform: translateY(0); }
     }
     .icon {
-      font-size: 48px;
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
       margin-bottom: 1rem;
       display: inline-block;
       animation: float 3s ease-in-out infinite;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     }
     @keyframes float {
       0%, 100% { transform: translateY(0); }
@@ -276,7 +279,7 @@ export function middleware(request) {
 </head>
 <body>
   <div class="container">
-    <div class="icon">📱</div>
+    <img src="/logo.png" alt="VidLook Icon" class="icon" />
     <h1>VidLook</h1>
     <p>VidLook is a <span class="highlight">World mini app</span>, where you watch YouTube videos and earn <span class="highlight">$VIDEO tokens</span>. Please open the app inside World App.</p>
     <a href="http://worldcoin.org/mini-app?app_id=app_73c5e4221add70bae4ab73cfe37670d4" class="btn">Open in World App</a>
