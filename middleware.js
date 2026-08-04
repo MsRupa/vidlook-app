@@ -189,9 +189,100 @@ export function middleware(request) {
     // Block desktop browsers — mobile-only app
     if (isDesktopBrowser(ua)) {
       return new NextResponse(
-        `<!DOCTYPE html><html><head><title>VidLook</title></head><body style="background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center">
-          <div><h1>📱 VidLook</h1><p>VidLook is a mobile app. Please open it in the <a href="https://world.org/download" style="color:#ef4444">World App</a>.</p></div>
-        </body></html>`,
+        `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VidLook - World Mini App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 70%);
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      overflow: hidden;
+    }
+    .container {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 3rem 2.5rem;
+      border-radius: 24px;
+      max-width: 400px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .icon {
+      font-size: 48px;
+      margin-bottom: 1rem;
+      display: inline-block;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0 0 1rem 0;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #94a3b8;
+      margin: 0 0 2rem 0;
+    }
+    .highlight {
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📱</div>
+    <h1>VidLook</h1>
+    <p>VidLook is a <span class="highlight">World mini app</span>, where you watch YouTube videos and earn <span class="highlight">$VIDEO tokens</span>. Please open the app inside World App.</p>
+    <a href="http://worldcoin.org/mini-app?app_id=app_73c5e4221add70bae4ab73cfe37670d4" class="btn">Open in World App</a>
+  </div>
+</body>
+</html>`,
         { 
           status: 200, 
           headers: { 
